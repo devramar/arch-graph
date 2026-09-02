@@ -29,10 +29,14 @@ pub(crate) struct Resolution {
 impl SymbolIndex {
     pub fn add_source(&mut self, relative_path: &Path, contents: &str) {
         for symbol in extract_exported_symbols(relative_path, contents) {
-            self.by_name
-                .entry(symbol.name.clone())
-                .or_default()
-                .push(symbol);
+            let candidates = self.by_name.entry(symbol.name.clone()).or_default();
+
+            // TypeScript declaration merging (for example `type DateKey` plus
+            // `namespace DateKey`) should still represent one graph target when
+            // the declarations live in the same module.
+            if candidates.iter().all(|candidate| candidate.file != symbol.file) {
+                candidates.push(symbol);
+            }
         }
     }
 
@@ -198,6 +202,6 @@ const hidden = 1;
         assert_eq!(index.by_name["EventStore"].len(), 1);
         assert_eq!(index.by_name["Thing"].len(), 1);
         assert!(!index.by_name.contains_key("hidden"));
-        assert_eq!(index.by_name["DateKey"].len(), 2);
+        assert_eq!(index.by_name["DateKey"].len(), 1);
     }
 }

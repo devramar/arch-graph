@@ -71,7 +71,8 @@ pub fn scan_project_with_options(
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
-        .add_custom_ignore_filename(".archgraphignore");
+        .add_custom_ignore_filename(".archgraphignore")
+        .filter_entry(|entry| !should_skip(entry.path()));
 
     for result in builder.build() {
         let Ok(entry) = result else { continue };

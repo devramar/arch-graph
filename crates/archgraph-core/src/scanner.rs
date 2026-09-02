@@ -87,7 +87,8 @@ pub fn scan_project_with_options(
 
         if relative_path
             .file_name()
-            .is_some_and(|name| name == options.architecture_filename.as_str())
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == options.architecture_filename)
         {
             let contents = read_utf8(path)?;
             documents.push(parse_architecture_document(relative_path, &contents));

@@ -1,5 +1,5 @@
 declare module 'cytoscape-fcose' {
-    import type { Ext } from 'cytoscape';
-    const extension: Ext;
-    export default extension;
+    import cytoscape = require('cytoscape');
+    const extension: cytoscape.Ext;
+    export = extension;
 }

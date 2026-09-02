@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4",
-    "@types/cytoscape": "3.21.9",
     "@types/react": "19.2.8",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.1.1",

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archgraph.dev/schema/architecture-graph-v1.json",
+  "title": "ArchGraph Architecture Graph",
+  "description": "Presentation-independent serialized output of archgraph-core.",
+  "type": "object",
+  "required": ["version", "project", "nodes", "edges", "diagnostics"],
+  "properties": {
+    "version": { "const": 1 },
+    "project": {
+      "type": "object",
+      "required": ["name", "root"],
+      "properties": {
+        "name": { "type": "string" },
+        "root": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sourceLocation": {
+      "type": "object",
+      "required": ["file"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": ["integer", "null"], "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": { "enum": ["architecture", "module", "external", "unresolved"] },
+        "source": {
+          "anyOf": [
+            { "$ref": "#/$defs/sourceLocation" },
+            { "type": "null" }
+          ]
+        },
+        "summary": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "source", "target", "targetName", "sourceLocation", "resolution"],
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "targetName": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "sourceLocation": { "$ref": "#/$defs/sourceLocation" },
+        "resolution": { "enum": ["architecture", "module", "unresolved", "ambiguous"] }
+      },
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "enum": ["ARCH001", "ARCH002", "ARCH003", "ARCH004", "ARCH005"] },
+        "severity": { "enum": ["warning", "error"] },
+        "message": { "type": "string" },
+        "source": {
+          "anyOf": [
+            { "$ref": "#/$defs/sourceLocation" },
+            { "type": "null" }
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

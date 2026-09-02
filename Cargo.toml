@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "crates/archgraph-core",
+    "crates/archgraph-cli",
+    "apps/desktop/src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["ArchGraph contributors"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+regex = "1"
+ignore = "0.4"

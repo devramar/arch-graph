@@ -115,7 +115,7 @@ fn extract_exported_symbols(relative_path: &Path, contents: &str) -> Vec<ModuleS
     static EXPORT_RE: OnceLock<Regex> = OnceLock::new();
     let regex = EXPORT_RE.get_or_init(|| {
         Regex::new(
-            r"(?x)^\s*export\s+(?:declare\s+)?(?:default\s+)?(?:abstract\s+)?(?:class|interface|type|enum|namespace|function|const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)",
+            r"(?x)^\s*export\s+(?:declare\s+)?(?:default\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|interface|type|enum|namespace|function|const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)",
         )
         .expect("valid export regex")
     });

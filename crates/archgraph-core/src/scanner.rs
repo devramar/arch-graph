@@ -64,6 +64,7 @@ pub fn scan_project_with_options(
     let mut documents = Vec::new();
     let mut symbols = SymbolIndex::default();
 
+    let filter_root = root.clone();
     let mut builder = WalkBuilder::new(&root);
     builder
         .hidden(!options.include_hidden)
@@ -72,18 +73,24 @@ pub fn scan_project_with_options(
         .git_global(true)
         .git_exclude(true)
         .add_custom_ignore_filename(".archgraphignore")
-        .filter_entry(|entry| !should_skip(entry.path()));
+        .filter_entry(move |entry| {
+            let relative = entry.path().strip_prefix(&filter_root).unwrap_or(entry.path());
+            !should_skip(relative)
+        });
 
     for result in builder.build() {
         let Ok(entry) = result else { continue };
         let path = entry.path();
-        if path == root || should_skip(path) || !entry.file_type().is_some_and(|kind| kind.is_file()) {
+        if path == root || !entry.file_type().is_some_and(|kind| kind.is_file()) {
             continue;
         }
 
         let Ok(relative_path) = path.strip_prefix(&root) else {
             continue;
         };
+        if should_skip(relative_path) {
+            continue;
+        }
 
         if relative_path
             .file_name()

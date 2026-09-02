@@ -160,7 +160,16 @@ export function GraphCanvas({ graph, filters, search, selection, onSelectionChan
         cy.on('pan zoom', clearHover);
 
         const keyDown = (event: KeyboardEvent) => {
-            if (event.code !== 'Space' || event.repeat || ['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement)?.tagName)) return;
+            const tagName = (event.target as HTMLElement | null)?.tagName;
+            if (['INPUT', 'TEXTAREA'].includes(tagName ?? '')) return;
+
+            if (event.code === 'KeyF' && !event.repeat) {
+                cy.fit(undefined, 48);
+                event.preventDefault();
+                return;
+            }
+
+            if (event.code !== 'Space' || event.repeat) return;
             spaceDownRef.current = true;
             container.classList.add('space-pan-active');
             event.preventDefault();

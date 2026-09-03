@@ -1,4 +1,4 @@
-import type { JSX, ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 
 interface MarkdownDocumentProps {
     markdown: string;
@@ -64,8 +64,7 @@ export function MarkdownDocument({ markdown }: MarkdownDocumentProps) {
         const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
         if (heading) {
             const level = Math.min(heading[1].length + 1, 6);
-            const Heading = `h${level}` as keyof JSX.IntrinsicElements;
-            blocks.push(<Heading key={`heading:${index}`}>{inlineMarkdown(heading[2])}</Heading>);
+            blocks.push(createElement(`h${level}`, { key: `heading:${index}` }, inlineMarkdown(heading[2])));
             index += 1;
             continue;
         }

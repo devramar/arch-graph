@@ -1,20 +1,24 @@
-import type { ArchitectureGraph, GraphSelection } from '../types';
+import type { ArchitectureGraph, GraphSelection, SourceLocation } from '../types';
 
 interface InspectorProps {
     graph: ArchitectureGraph;
     selection: GraphSelection;
+    onOpenSource: (source: SourceLocation) => void;
 }
 
-function Source({ file, line }: { file: string; line?: number | null }) {
+function Source({ source, onOpenSource }: { source: SourceLocation; onOpenSource: (source: SourceLocation) => void }) {
     return (
-        <div className="source-path">
-            <span>{file}</span>
-            {line ? <span className="source-line">:{line}</span> : null}
+        <div className="source-block">
+            <div className="source-path">
+                <span>{source.file}</span>
+                {source.line ? <span className="source-line">:{source.line}</span> : null}
+            </div>
+            <button className="source-open-button" onClick={() => onOpenSource(source)}>Open in editor</button>
         </div>
     );
 }
 
-export function Inspector({ graph, selection }: InspectorProps) {
+export function Inspector({ graph, selection, onOpenSource }: InspectorProps) {
     if (!selection) {
         return (
             <aside className="inspector empty-panel">
@@ -43,7 +47,7 @@ export function Inspector({ graph, selection }: InspectorProps) {
                 {node.source ? (
                     <section>
                         <h3>Source</h3>
-                        <Source file={node.source.file} line={node.source.line} />
+                        <Source source={node.source} onOpenSource={onOpenSource} />
                     </section>
                 ) : null}
             </aside>
@@ -68,8 +72,8 @@ export function Inspector({ graph, selection }: InspectorProps) {
                 <p className="inspector-copy">{edge.description || 'No relationship description was provided.'}</p>
             </section>
             <section>
-                <h3>Declared at</h3>
-                <Source file={edge.sourceLocation.file} line={edge.sourceLocation.line} />
+                <h3>Declaration</h3>
+                <Source source={edge.sourceLocation} onOpenSource={onOpenSource} />
             </section>
         </aside>
     );

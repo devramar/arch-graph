@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { GraphCanvas } from './components/GraphCanvas';
 import { Inspector } from './components/Inspector';
 import { Sidebar, type NodeKindFilter } from './components/Sidebar';
-import { chooseProjectFolder, desktopRuntimeAvailable, listenForProjectDrop, scanProject } from './lib/desktop';
+import { chooseProjectFolder, desktopRuntimeAvailable, listenForProjectDrop, openProjectSource, scanProject } from './lib/desktop';
 import { demoGraph } from './lib/demoGraph';
-import type { ArchitectureGraph, GraphSelection, NodeKind } from './types';
+import type { ArchitectureGraph, GraphSelection, NodeKind, SourceLocation } from './types';
 
 const defaultFilters: NodeKindFilter = {
     architecture: true,
@@ -72,6 +72,14 @@ export default function App() {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, []);
 
+
+    const openSource = (source: SourceLocation) => {
+        if (!desktop) return;
+        void openProjectSource(graph?.project.root ?? '', source).catch((reason) => {
+            console.error('Could not open source declaration', reason);
+        });
+    };
+
     const openFolder = async () => {
         if (!desktop) return;
         const root = await chooseProjectFolder();
@@ -135,8 +143,9 @@ export default function App() {
                     search={search}
                     selection={selection}
                     onSelectionChange={setSelection}
+                    onOpenSource={openSource}
                 />
-                <Inspector graph={graph} selection={selection} />
+                <Inspector graph={graph} selection={selection} onOpenSource={openSource} />
             </div>
             <footer className="statusbar">
                 <span>{graph.nodes.length} nodes</span>
@@ -144,7 +153,7 @@ export default function App() {
                 <span>{graph.diagnostics.length} diagnostics</span>
                 <span className="status-spacer" />
                 <span>Left / middle / Space + drag to pan</span>
-                <span>Wheel to zoom</span>
+                <span>Wheel to zoom · Shift for faster zoom</span>
             </footer>
         </main>
     );

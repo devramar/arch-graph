@@ -16,6 +16,17 @@ The repository contains three runtime boundaries:
 - Current Tauri 2 drag/drop API and current Cytoscape/Tauri package versions checked against upstream documentation/package metadata.
 - Source-level review performed after each implementation phase.
 
+## User-side validation from the previous checkpoint
+
+The previous checkpoint was run on the target Arch Linux development machine:
+
+- `cargo test --workspace` passed after installing the required WebKitGTK system package.
+- `npm run tauri dev` compiled and launched after disabling WebKitGTK DMABUF rendering.
+- the DMABUF workaround is now applied at process startup in `src-tauri/src/main.rs`.
+- project scanning and graph rendering were manually confirmed against the real events architecture documents.
+
+The changes added after that checkpoint (Tauri opener integration, architecture-document payload/rendering, and build scripts) still need one user-side compile/runtime pass.
+
 ## Validation not completed here
 
 The build environment did not contain `rustc` or `cargo`. Per project instruction, no Rust installation was attempted.

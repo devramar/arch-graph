@@ -129,6 +129,7 @@ fn build_graph(
                 line: Some(parsed_node.line),
             }),
             summary: None,
+            documentation: Some(document.documentation.clone()),
         };
 
         architecture_by_name

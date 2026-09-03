@@ -7,6 +7,7 @@ pub(crate) struct ParsedArchitectureDocument {
     pub node: Option<ParsedNode>,
     pub dependencies: Vec<ParsedDependency>,
     pub diagnostics: Vec<Diagnostic>,
+    pub documentation: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +85,7 @@ pub(crate) fn parse_architecture_document(
         node,
         dependencies,
         diagnostics,
+        documentation: contents.to_owned(),
     }
 }
 

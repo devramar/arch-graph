@@ -8,6 +8,7 @@ fn scans_architecture_and_typescript_targets() {
 
     assert_eq!(graph.version, 1);
     assert!(graph.nodes.iter().any(|node| node.name == "EventSync" && node.kind == NodeKind::Architecture));
+    assert!(graph.nodes.iter().find(|node| node.name == "EventSync").and_then(|node| node.documentation.as_deref()).is_some_and(|documentation| documentation.contains("ARCH_NODE:EventSync")));
     assert!(graph.nodes.iter().any(|node| node.name == "DateKey" && node.kind == NodeKind::Module));
     assert!(graph.edges.iter().any(|edge| edge.target_name == "DateKey" && edge.resolution == EdgeResolution::Module));
     assert!(graph.edges.iter().any(|edge| edge.target_name == "RemoteChanges" && edge.resolution == EdgeResolution::Unresolved));

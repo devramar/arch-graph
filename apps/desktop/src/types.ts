@@ -14,6 +14,7 @@ export interface ArchitectureNode {
     kind: NodeKind;
     source?: SourceLocation | null;
     summary?: string | null;
+    documentation?: string | null;
 }
 
 export interface ArchitectureEdge {

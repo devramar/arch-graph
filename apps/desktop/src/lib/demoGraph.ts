@@ -12,12 +12,14 @@ export const demoGraph: ArchitectureGraph = {
             name: 'Events',
             kind: 'architecture',
             source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
+            documentation: '# Events\n\nARCH_NODE:Events\n\n## Description\n\nCoordinates the event feature and its major subsystems.\n',
         },
         {
             id: 'arch:sync#EventSync',
             name: 'EventSync',
             kind: 'architecture',
             source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
+            documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\n## Description\n\nCoordinates synchronization of remote event-day changes with locally stored event data.\n\n## Dependencies\n\nARCH_DEPENDENCY:DateKey\n\nUsed as the canonical day representation when constructing synchronization windows.\n',
         },
         {
             id: 'module:DateKey#DateKey',

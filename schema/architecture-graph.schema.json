@@ -53,7 +53,8 @@
             { "type": "null" }
           ]
         },
-        "summary": { "type": ["string", "null"] }
+        "summary": { "type": ["string", "null"] },
+        "documentation": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },

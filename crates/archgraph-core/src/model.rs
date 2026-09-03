@@ -28,6 +28,8 @@ pub struct ArchitectureNode {
     pub kind: NodeKind,
     pub source: Option<SourceLocation>,
     pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub documentation: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]

@@ -1,7 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import type { ArchitectureGraph } from '../types';
+import type { ArchitectureGraph, SourceLocation } from '../types';
 
 export function desktopRuntimeAvailable(): boolean {
     return isTauri();
@@ -9,6 +9,10 @@ export function desktopRuntimeAvailable(): boolean {
 
 export async function scanProject(root: string): Promise<ArchitectureGraph> {
     return invoke<ArchitectureGraph>('scan_project', { root });
+}
+
+export async function openProjectSource(root: string, source: SourceLocation): Promise<void> {
+    await invoke('open_project_source', { root, file: source.file });
 }
 
 export async function chooseProjectFolder(): Promise<string | null> {

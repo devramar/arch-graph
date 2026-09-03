@@ -9,7 +9,7 @@ Desktop-first Tauri application for interactively exploring graphs produced by A
 ---
 ## Purpose
 
-Provide a local PC-optimized graph explorer with project drag/drop, search, filtering, relationship hover documentation, and detailed inspection.
+Provide a local PC-optimized graph explorer with project drag/drop, search, filtering, relationship hover documentation, source opening, force-directed settling, and detailed inspection.
 
 ---
 ## Intended Usage
@@ -39,6 +39,8 @@ The frontend consumes the neutral graph contract rather than embedding scanner s
 - The webview does not receive generic filesystem traversal APIs.
 - Left background drag, middle drag, and Space+drag all pan the graph.
 - Normal direct node drag remains available.
+- Source opening is confined to files beneath the selected project root.
+- Relationship descriptions remain edge-owned documentation and may be surfaced at the cursor, in the inspector, or in the graph description panel.
 
 ---
 ## Relevant Files

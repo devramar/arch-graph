@@ -129,7 +129,7 @@ function runLayout(cy: Core, layout: LayoutName, incremental = false) {
 
     cy.layout({
         name: 'fcose',
-        quality: 'default',
+        quality: incremental ? 'proof' : 'default',
         randomize: !incremental,
         animate: incremental,
         animationDuration: incremental ? 350 : 0,

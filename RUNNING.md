@@ -9,7 +9,7 @@
 - Rust toolchain with `cargo` and `rustc`
 - Tauri 2 platform prerequisites for your OS
 
-On Linux, Tauri also requires the normal WebKit/GTK system dependencies documented by Tauri for your distribution.
+On Linux, Tauri also requires the normal WebKit/GTK system dependencies documented by Tauri for your distribution. ArchGraph disables WebKitGTK's DMABUF renderer before Tauri initialization to avoid the observed Wayland protocol crash on affected systems.
 
 ## Install frontend dependencies
 

@@ -44,7 +44,7 @@ interface GraphContextMenu {
 const DEFAULT_WHEEL_SENSITIVITY = 0.54;
 const SHIFT_WHEEL_SENSITIVITY = 1.0;
 
-const nodeStyle: cytoscape.Stylesheet[] = [
+const nodeStyle: cytoscape.StylesheetJson = [
     {
         selector: 'node',
         style: {
@@ -58,10 +58,10 @@ const nodeStyle: cytoscape.Stylesheet[] = [
             'text-valign': 'center',
             'text-halign': 'center',
             'text-wrap': 'wrap',
-            'text-max-width': 96,
+            'text-max-width': '96',
             width: 'label',
             height: 34,
-            padding: 12,
+            padding: '12',
             shape: 'round-rectangle',
         },
     },

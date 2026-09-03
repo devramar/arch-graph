@@ -1,6 +1,8 @@
 # ArchGraph
 
-ArchGraph is an offline desktop tool for exploring a codebase as an architecture graph.
+ArchGraph is an offline vibe coded desktop tool for exploring a codebase as an architecture graph.
+
+I didn't want to spend time making this nice. This is basically a prototype application for me.
 
 Projects describe important systems with lightweight `ARCHITECTURE.md` files. ArchGraph scans those documents, resolves their declared dependencies, and renders the result as an interactive graph.
 

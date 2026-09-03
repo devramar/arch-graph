@@ -19,7 +19,7 @@ Drop or open one project root, then explore its generated graph. The frontend do
 ---
 ## Architecture
 
-The Tauri adapter invokes the standalone Rust core and returns its neutral graph. React translates that model into Cytoscape.js elements and owns presentation and interaction only.
+The Tauri adapter invokes the standalone Rust core and returns its neutral graph. React translates that model into Cytoscape.js elements and owns presentation and interaction only. Architecture-node graph records include their raw architecture document so the inspector can display documentation without obtaining direct filesystem read access.
 
 ---
 ## Dependencies
@@ -39,7 +39,8 @@ The frontend consumes the neutral graph contract rather than embedding scanner s
 - The webview does not receive generic filesystem traversal APIs.
 - Left background drag, middle drag, and Space+drag all pan the graph.
 - Normal direct node drag remains available.
-- Source opening is confined to files beneath the selected project root.
+- Source opening is confined to files beneath the selected project root and delegates to the system default application through Tauri's opener integration.
+- Architecture document viewing consumes document content already present in the core graph model; the frontend does not read source files itself.
 - Relationship descriptions remain edge-owned documentation and may be surfaced at the cursor, in the inspector, or in the graph description panel.
 
 ---
@@ -50,6 +51,12 @@ The frontend consumes the neutral graph contract rather than embedding scanner s
 
 `src/components/GraphCanvas.tsx`
 : Cytoscape rendering and desktop graph interaction.
+
+`src/components/Inspector.tsx`
+: Node/relationship inspection, source actions, and architecture-document presentation.
+
+`src/components/MarkdownDocument.tsx`
+: Small safe Markdown-oriented architecture document renderer.
 
 `src-tauri/src/lib.rs`
 : Thin Tauri adapter around ArchGraph Core.

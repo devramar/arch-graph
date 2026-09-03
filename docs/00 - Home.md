@@ -19,6 +19,7 @@ The graph is intentionally based on explicit architectural documentation rather 
 - [[30 - Desktop App/Interaction Model]]
 - [[40 - Constraints/Security and Offline]]
 - [[50 - Scope/MVP Scope]]
+- [[60 - Implementation/Build and Packaging]]
 - [[90 - Decisions/Decisions]]
 
 ## Core idea

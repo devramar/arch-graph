@@ -35,12 +35,38 @@ The selected root is sent to the standalone Rust scanner and the resulting graph
 
 ## Build the desktop app
 
+The repository-level build scripts are the preferred entry point:
+
 ```bash
-cd apps/desktop
-npm run tauri build
+./scripts/build.sh native
 ```
 
-Tauri will place platform-specific bundles under its normal `src-tauri/target` output directories.
+Target-specific helpers are also available:
+
+```bash
+./scripts/build.sh linux x86_64
+./scripts/build.sh windows x86_64
+./scripts/build.sh macos universal
+./scripts/build.sh core
+```
+
+See `scripts/README.md` for host requirements and cross-build notes. Tauri places bundles beneath the repository `target/<target>/release/bundle/` tree (or `target/release/bundle/` for a native build).
+
+## Application icon
+
+Put the master icon at:
+
+```text
+assets/app-icon.png
+```
+
+A square 1024x1024 transparent PNG is recommended; a square SVG is also accepted. Then generate all platform assets with:
+
+```bash
+./scripts/generate-icons.sh
+```
+
+The generated files replace the contents of `apps/desktop/src-tauri/icons/`, which is already wired into `tauri.conf.json`.
 
 ## Run only the browser UI
 
@@ -65,7 +91,13 @@ cargo run -p archgraph-cli -- /path/to/project > graph.json
 
 This scans the project and writes the neutral graph model as JSON to stdout.
 
-## Run Rust tests
+## Run checks
+
+```bash
+./scripts/check.sh
+```
+
+Or run the Rust workspace directly:
 
 ```bash
 cargo test --workspace

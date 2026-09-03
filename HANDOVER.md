@@ -61,7 +61,6 @@ After `npm run tauri dev` succeeds:
 - Qualified dependency syntax such as `@/core/date/DateKey#DateKey` is documented as a future escape hatch but is not implemented yet.
 - TypeScript exported-symbol discovery is intentionally lightweight. It recognizes common direct `export class/interface/type/enum/namespace/function/const/let/var` declarations. It does not implement the TypeScript type system or barrel re-export semantics.
 - `External` node resolution is represented in the graph schema/UI but the scanner does not yet automatically classify package/service dependencies as external.
-- Source navigation currently displays source location; it does not yet launch the user's editor.
 - Live filesystem watching is not part of the MVP.
 
 ## Useful next implementation rounds
@@ -74,3 +73,17 @@ High-value next steps after first runtime validation:
 - graph JSON import/export in the desktop UI
 - filesystem watch + incremental rescan
 - persisted manual node positions
+- editor-specific line/column deep-links (the current opener intentionally uses the OS default application)
+
+
+## Current source navigation
+
+Source and declaration actions are confined to the selected project root and are opened through Tauri's system opener integration. On Linux/macOS/Windows this delegates to the operating system's registered default application for that file type. Failures are surfaced in the desktop UI instead of being console-only.
+
+## Architecture document inspection
+
+Architecture nodes now carry their source `ARCHITECTURE.md` content in the neutral core graph model. This keeps document inspection usable by any graph consumer rather than requiring the desktop frontend to read files directly. The desktop inspector renders that content as a small safe Markdown reader.
+
+## Build and icon tooling
+
+See `scripts/README.md`. `assets/app-icon.png` is the conventional master icon location and `./scripts/generate-icons.sh` generates the platform-specific Tauri icon set.

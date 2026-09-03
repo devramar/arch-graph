@@ -21,6 +21,7 @@ export default function App() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [dropHover, setDropHover] = useState(false);
+    const [sourceOpenError, setSourceOpenError] = useState<string | null>(null);
     const searchRef = useRef<HTMLInputElement | null>(null);
     const desktop = useMemo(() => desktopRuntimeAvailable(), []);
 
@@ -75,8 +76,11 @@ export default function App() {
 
     const openSource = (source: SourceLocation) => {
         if (!desktop) return;
+        setSourceOpenError(null);
         void openProjectSource(graph?.project.root ?? '', source).catch((reason) => {
+            const message = reason instanceof Error ? reason.message : String(reason);
             console.error('Could not open source declaration', reason);
+            setSourceOpenError(message);
         });
     };
 
@@ -147,6 +151,13 @@ export default function App() {
                 />
                 <Inspector graph={graph} selection={selection} onOpenSource={openSource} />
             </div>
+            {sourceOpenError ? (
+                <div className="source-error-toast" role="alert">
+                    <strong>Could not open source</strong>
+                    <span>{sourceOpenError}</span>
+                    <button onClick={() => setSourceOpenError(null)}>Dismiss</button>
+                </div>
+            ) : null}
             <footer className="statusbar">
                 <span>{graph.nodes.length} nodes</span>
                 <span>{graph.edges.length} relationships</span>

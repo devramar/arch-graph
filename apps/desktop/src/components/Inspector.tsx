@@ -1,4 +1,5 @@
 import type { ArchitectureGraph, GraphSelection, SourceLocation } from '../types';
+import { MarkdownDocument } from './MarkdownDocument';
 
 interface InspectorProps {
     graph: ArchitectureGraph;
@@ -48,6 +49,17 @@ export function Inspector({ graph, selection, onOpenSource }: InspectorProps) {
                     <section>
                         <h3>Source</h3>
                         <Source source={node.source} onOpenSource={onOpenSource} />
+                    </section>
+                ) : null}
+                {node.documentation ? (
+                    <section className="architecture-document-section">
+                        <h3>Architecture document</h3>
+                        <MarkdownDocument markdown={node.documentation} />
+                    </section>
+                ) : node.kind === 'architecture' ? (
+                    <section>
+                        <h3>Architecture document</h3>
+                        <p className="muted">No document content was included in this graph.</p>
                     </section>
                 ) : null}
             </aside>

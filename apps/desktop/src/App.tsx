@@ -314,27 +314,19 @@ export default function App() {
         setLoading(true);
         setError(null);
         setSelection(null);
-
         try {
             const scan = await scanProject(project.graph.project.root);
-
-            // A session-aware project should reload its persisted configuration.
             if (scan.configurationExists) {
                 loadScan(scan);
                 return;
             }
 
-            // Session-blind projects keep their current desktop arrangement.
             const sessionConfiguration = configurationWithDesktopSession(
                 scan.configuration,
                 layerGroups,
                 layout,
             );
-            const groups = layerGroupsFromConfiguration(
-                sessionConfiguration,
-                scan.layers,
-            );
-
+            const groups = layerGroupsFromConfiguration(sessionConfiguration, scan.layers);
             setProject(scan);
             setGraph(scan.graph);
             setLayerGroups(groups);
@@ -376,26 +368,14 @@ export default function App() {
         <main className={`app-shell ${dropHover ? 'drop-hover' : ''}`}>
             <header className="topbar">
                 <div className="brand"><span className="brand-mark small">AG</span><strong>ArchGraph</strong></div>
-                    <button
-                        className="project-button"
-                        disabled={loading}
-                        onClick={desktop ? openFolder : () => {
-                            setProject(null);
-                            setGraph(null);
-                        }}
-                    >
-                        {desktop ? 'Open Project' : 'Back'}
+                <button className="project-button" disabled={loading} onClick={desktop ? openFolder : () => { setProject(null); setGraph(null); }}>
+                    {desktop ? 'Open Project' : 'Back'}
+                </button>
+                {desktop ? (
+                    <button className="project-button" disabled={loading} onClick={refreshProject}>
+                        Refresh Project
                     </button>
-
-                    {desktop ? (
-                        <button
-                            className="project-button"
-                            disabled={loading}
-                            onClick={refreshProject}
-                        >
-                            {loading ? 'Refreshing…' : 'Refresh Project'}
-                        </button>
-                    ) : null}
+                ) : null}
                 <div className="search-wrap">
                     <span>⌕</span>
                     <input

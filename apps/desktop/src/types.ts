@@ -89,6 +89,8 @@ export interface ProjectConfiguration {
     ignored_paths: string[];
     layers: Record<string, {
         display_name: string;
+        path_root: string;
+        ignored_paths: string[];
         files: string[];
         markers: {
             ARCH_NODE: string[];

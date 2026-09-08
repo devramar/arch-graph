@@ -1,10 +1,31 @@
 {
-  "ignored_paths": [
-    "/crates/archgraph-core/tests/*"
-  ],
+  "ignored_paths": [],
   "layers": {
     "architecture": {
-      "display_name": "Architecture",
+      "display_name": "Core Architecture",
+      "path_root": "crates",
+      "ignored_paths": [
+        "archgraph-core/tests/fixtures/**"
+      ],
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "markers": {
+        "ARCH_NODE": [
+          "ARCH_NODE"
+        ],
+        "ARCH_REFERENCE": [
+          "ARCH_REFERENCE"
+        ],
+        "ARCH_SUBREFERENCE": [
+          "ARCH_SUBREFERENCE"
+        ]
+      }
+    },
+    "desktop": {
+      "display_name": "Desktop Architecture",
+      "path_root": "apps/desktop",
+      "ignored_paths": [],
       "files": [
         "ARCHITECTURE.md"
       ],
@@ -27,25 +48,18 @@
       "subreferences": {}
     }
   },
-  "default_view": "directed",
+  "default_view": "organic",
   "view_settings": {
     "desktop": {
       "layer_groups": [
         {
           "enabled": true,
-          "id": "layer:architecture",
+          "id": "archgraph",
           "layer_ids": [
-            "architecture"
+            "architecture",
+            "desktop"
           ],
-          "name": "Architecture"
-        },
-        {
-          "enabled": true,
-          "id": "layer:test",
-          "layer_ids": [
-            "test"
-          ],
-          "name": "Test Layer"
+          "name": "Core Architecture + Desktop Architecture"
         }
       ]
     }

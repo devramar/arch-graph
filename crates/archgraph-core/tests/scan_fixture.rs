@@ -71,6 +71,15 @@ fn scans_layers_globs_decorated_sources_and_ignored_paths() {
 
     assert!(scan.configuration_exists);
     assert_eq!(scan.layers.len(), 2);
+    assert_eq!(scan.configuration.layers["architecture"].path_root, ".");
+    assert_eq!(
+        scan.configuration.layers["architecture"].ignored_paths,
+        vec!["ignored/**".to_owned()]
+    );
+    assert_eq!(
+        scan.configuration.layers["implementation"].path_root,
+        "implementation"
+    );
     assert!(
         !scan
             .graph
@@ -84,6 +93,13 @@ fn scans_layers_globs_decorated_sources_and_ignored_paths() {
             .nodes
             .iter()
             .any(|node| node.name == "ordinaryCode")
+    );
+    assert!(
+        !scan
+            .graph
+            .nodes
+            .iter()
+            .any(|node| node.name == "Outside Implementation Root")
     );
 
     let identity = scan

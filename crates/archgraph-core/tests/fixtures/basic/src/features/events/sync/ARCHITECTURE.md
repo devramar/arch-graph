@@ -2,20 +2,22 @@
 
 ARCH_NODE:EventSync
 
+EventSync coordinates reconciliation between locally persisted event state and remotely collected changes.
+
 ## References
 
 ARCH_REFERENCE:DateKey
 
-Used as the canonical day representation when constructing synchronization windows.
+EventSync uses DateKey as the canonical day representation when constructing synchronization windows.
 
 ARCH_REFERENCE:EventStore
 
-Provides the local event state against which synchronization results are reconciled.
+EventSync reads local event state from EventStore and reconciles remote results against it.
 
 ARCH_REFERENCE:RemoteChanges
 
-Delegates remote change collection to the documented remote changes subsystem.
+EventSync delegates remote change collection to RemoteChanges before reconciliation.
 
 ARCH_SUBREFERENCE:Password Management
 
-Represents password handling that belongs only to this architecture node.
+EventSync keeps this password-handling concern local to its own architecture boundary.

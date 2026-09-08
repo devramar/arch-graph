@@ -2,67 +2,26 @@
 
 ARCH_NODE:ArchGraph Core
 
-## Description
+ArchGraph Core is the language-agnostic Rust engine that interprets explicitly authored architecture declarations and produces presentation-neutral layered graphs.
 
-Standalone Rust engine that discovers explicit architecture declarations, organizes them into logical layers, composes selected layer groups, and emits a presentation-independent directed graph.
+Its public boundary covers project configuration, source discovery, declaration parsing, reference semantics, layer construction, graph composition, diagnostics, and safe `.archgraph` persistence. It does not infer architecture from imports, exports, package metadata, ASTs, or programming-language semantics.
 
----
-## Purpose
+The crate exposes high-level scan and composition operations while keeping the parsing, resolution, path handling, and graph-building machinery internal.
 
-Own project scanning, `.archgraph` configuration, source discovery, declaration parsing, reference semantics, layer composition, diagnostics, and graph construction independently of any UI or programming language.
-
----
-## Intended Usage
-
-Use `scan_project(root)` for the default all-layer composition, `scan_project_state(root)` when a consumer needs independently scanned layers/configuration, and `compose_project_layers(...)` when an app needs custom layer groups without rescanning the filesystem.
-
----
-## Architecture
-
-The scanner reads root `.archgraph`, applies built-in/Git/custom ignored paths, matches source candidates against per-layer file globs, and assigns each matched source to exactly one layer.
-
-Markdown sources use the Markdown parser. Every other source type uses the language-agnostic decorated-text parser. Candidate files without markers are ignored.
-
-Each layer is scanned independently. Composition then merges same-name architecture declarations only inside explicitly supplied layer groups. Different groups remain independent even when names match.
-
-Undocumented ordinary references become shared lightweight reference nodes. Subreferences always become source-local lightweight nodes and never merge or resolve by name.
-
----
 ## References
 
-ARCH_REFERENCE:ArchGraph Desktop
+ARCH_REFERENCE:Core Engine
 
-Consumes independently scanned layers and asks the core to compose desktop layer groups rather than reimplementing merge semantics in TypeScript.
+ArchGraph Core delegates project interpretation and graph construction to Core Engine, which coordinates configuration, discovery, parsing, per-layer resolution, and final composition behind the crate's exported API.
 
----
-## Invariants
+ARCH_REFERENCE:Project Configuration
 
-- Architectural edges only originate from explicit reference/subreference markers.
-- Candidate source globs never imply graph membership without ArchGraph markers.
-- Source-code imports, exports, modules, and language syntax are never parsed for graph meaning.
-- One source file may declare at most one architecture node.
-- A source matching multiple layers is skipped rather than assigned arbitrarily.
-- Same-name declarations merge only inside the same composition group.
-- Missing ordinary targets are valid shared reference nodes, not diagnostics.
-- Subreferences are always local to their declaration and never merge by name.
-- Project traversal does not follow symlinks by default.
-- `.archgraph` is root-scoped and parsed/validated/written by the core.
-- The serialized graph remains independent of Cytoscape.js and Tauri.
+ArchGraph Core loads and validates Project Configuration before discovery so layer roots, ignored paths, file globs, marker aliases, application colour overrides, and opaque view settings are applied consistently across consumers.
 
----
-## Relevant Files
+ARCH_REFERENCE:Graph Contract
 
-`src/config.rs`
-: `.archgraph` layers, ignored paths, markers, app settings, validation, and writes.
+ArchGraph Core emits Graph Contract values as the stable presentation-neutral result of scanning and composition, allowing CLI and desktop consumers to share the same node, edge, diagnostic, layer, and declaration semantics.
 
-`src/model.rs`
-: Neutral graph-v3, declaration, layer, and composition contracts.
+ARCH_REFERENCE:Layer Composition
 
-`src/parser.rs`
-: Extensible source-parser dispatch with Markdown and decorated-text parsers.
-
-`src/resolver.rs`
-: Per-layer architecture/reference/subreference target resolution.
-
-`src/scanner.rs`
-: Filesystem traversal, glob matching, layer scans, and core-owned group composition.
+ArchGraph Core composes independently scanned layers through Layer Composition so same-name declarations merge only inside explicit groups and references are resolved against the declarations visible in each group.

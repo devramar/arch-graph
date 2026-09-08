@@ -2,6 +2,4 @@
 
 ARCH_NODE:RemoteChanges
 
-## Description
-
-Represents the remote side of event synchronization.
+RemoteChanges represents the remote change-collection boundary used during event synchronization.

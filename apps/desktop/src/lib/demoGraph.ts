@@ -103,6 +103,8 @@ export const demoScan: ProjectScan = {
         layers: {
             architecture: {
                 display_name: 'Architecture',
+                path_root: '.',
+                ignored_paths: [],
                 files: ['ARCHITECTURE.md'],
                 markers: {
                     ARCH_NODE: ['ARCH_NODE'],

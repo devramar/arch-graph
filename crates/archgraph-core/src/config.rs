@@ -42,6 +42,8 @@ impl Default for ProjectConfiguration {
 #[serde(default, deny_unknown_fields)]
 pub struct LayerConfiguration {
     pub display_name: String,
+    pub path_root: String,
+    pub ignored_paths: Vec<String>,
     pub files: Vec<String>,
     pub markers: MarkerConfiguration,
 }
@@ -50,6 +52,8 @@ impl LayerConfiguration {
     fn default_architecture() -> Self {
         Self {
             display_name: "Architecture".to_owned(),
+            path_root: ".".to_owned(),
+            ignored_paths: Vec::new(),
             files: vec!["ARCHITECTURE.md".to_owned()],
             markers: MarkerConfiguration::default(),
         }
@@ -283,6 +287,12 @@ fn normalize_and_validate(
             };
         }
 
+        layer.path_root = normalize_layer_path_root(&layer.path_root)?;
+        normalize_path_list(&mut layer.ignored_paths);
+        for pattern in &layer.ignored_paths {
+            validate_glob_pattern(pattern, &format!("layers.{layer_id}.ignored_paths"))?;
+        }
+
         normalize_path_list(&mut layer.files);
         if layer.files.is_empty() && layer_id == DEFAULT_LAYER_ID {
             layer.files.push("ARCHITECTURE.md".to_owned());
@@ -411,6 +421,52 @@ fn normalize_path_list(values: &mut Vec<String>) {
     values.dedup();
 }
 
+fn normalize_layer_path_root(path_root: &str) -> Result<String, ConfigurationError> {
+    let normalized = path_root.trim().replace('\\', "/");
+    if normalized.is_empty() || normalized == "." || normalized == "./" {
+        return Ok(".".to_owned());
+    }
+    if normalized.starts_with('/')
+        || normalized
+            .as_bytes()
+            .get(1)
+            .is_some_and(|separator| *separator == b':')
+    {
+        return Err(ConfigurationError::Invalid(format!(
+            "layer path_root {path_root:?} must be relative to the project root"
+        )));
+    }
+    if normalized.contains('*') || normalized.contains('?') {
+        return Err(ConfigurationError::Invalid(format!(
+            "layer path_root {path_root:?} must be a literal directory path, not a glob"
+        )));
+    }
+    if normalized.contains('\0') || normalized.contains('\n') || normalized.contains('\r') {
+        return Err(ConfigurationError::Invalid(format!(
+            "layer path_root {path_root:?} contains an unsupported control character"
+        )));
+    }
+
+    let mut segments = Vec::new();
+    for segment in normalized.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                return Err(ConfigurationError::Invalid(format!(
+                    "layer path_root {path_root:?} must stay within the project root"
+                )));
+            }
+            _ => segments.push(segment),
+        }
+    }
+
+    if segments.is_empty() {
+        Ok(".".to_owned())
+    } else {
+        Ok(segments.join("/"))
+    }
+}
+
 fn validate_non_empty_list(name: &str, values: &[String]) -> Result<(), ConfigurationError> {
     if values.is_empty() {
         return Err(ConfigurationError::Invalid(format!(
@@ -452,6 +508,8 @@ mod tests {
             .layers
             .get(DEFAULT_LAYER_ID)
             .expect("architecture layer");
+        assert_eq!(architecture.path_root, ".");
+        assert!(architecture.ignored_paths.is_empty());
         assert_eq!(architecture.files, vec!["ARCHITECTURE.md".to_owned()]);
         assert_eq!(architecture.markers.node, vec!["ARCH_NODE".to_owned()]);
         assert_eq!(
@@ -462,6 +520,58 @@ mod tests {
             architecture.markers.subreference,
             vec!["ARCH_SUBREFERENCE".to_owned()]
         );
+    }
+
+    #[test]
+    fn layer_path_roots_are_normalized_and_may_not_escape_the_project() {
+        let config = ProjectConfiguration {
+            layers: BTreeMap::from([(
+                DEFAULT_LAYER_ID.to_owned(),
+                LayerConfiguration {
+                    path_root: " ./crates/archgraph-core/ ".to_owned(),
+                    files: vec!["ARCHITECTURE.md".to_owned()],
+                    ..LayerConfiguration::default()
+                },
+            )]),
+            ..ProjectConfiguration::default()
+        };
+        let normalized = normalize_and_validate(config).expect("valid rooted layer");
+        assert_eq!(
+            normalized.layers[DEFAULT_LAYER_ID].path_root,
+            "crates/archgraph-core"
+        );
+
+        let escaping = ProjectConfiguration {
+            layers: BTreeMap::from([(
+                DEFAULT_LAYER_ID.to_owned(),
+                LayerConfiguration {
+                    path_root: "../outside".to_owned(),
+                    files: vec!["ARCHITECTURE.md".to_owned()],
+                    ..LayerConfiguration::default()
+                },
+            )]),
+            ..ProjectConfiguration::default()
+        };
+        assert!(matches!(
+            normalize_and_validate(escaping),
+            Err(ConfigurationError::Invalid(_))
+        ));
+
+        let absolute = ProjectConfiguration {
+            layers: BTreeMap::from([(
+                DEFAULT_LAYER_ID.to_owned(),
+                LayerConfiguration {
+                    path_root: "/outside".to_owned(),
+                    files: vec!["ARCHITECTURE.md".to_owned()],
+                    ..LayerConfiguration::default()
+                },
+            )]),
+            ..ProjectConfiguration::default()
+        };
+        assert!(matches!(
+            normalize_and_validate(absolute),
+            Err(ConfigurationError::Invalid(_))
+        ));
     }
 
     #[test]
@@ -528,12 +638,13 @@ mod tests {
             default_view: Some(" sticky ".to_owned()),
             ..ProjectConfiguration::default()
         };
-        config
+        let architecture = config
             .layers
             .get_mut(DEFAULT_LAYER_ID)
-            .expect("architecture layer")
-            .markers
-            .reference = vec![" SYS_REF ".to_owned(), "ARCH_REF".to_owned()];
+            .expect("architecture layer");
+        architecture.path_root = " ./crates/core/ ".to_owned();
+        architecture.ignored_paths = vec![" generated/** ".to_owned()];
+        architecture.markers.reference = vec![" SYS_REF ".to_owned(), "ARCH_REF".to_owned()];
         config
             .app_colours
             .colour_overrides
@@ -545,6 +656,11 @@ mod tests {
         assert_eq!(written, loaded);
         assert_eq!(loaded.default_view.as_deref(), Some("sticky"));
         assert_eq!(loaded.ignored_paths, vec!["tests/fixtures/**".to_owned()]);
+        assert_eq!(loaded.layers[DEFAULT_LAYER_ID].path_root, "crates/core");
+        assert_eq!(
+            loaded.layers[DEFAULT_LAYER_ID].ignored_paths,
+            vec!["generated/**".to_owned()]
+        );
         assert_eq!(
             loaded.layers[DEFAULT_LAYER_ID].markers.reference,
             vec!["ARCH_REF".to_owned(), "SYS_REF".to_owned()]

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archgraph.dev/schema/project-configuration-v2.json",
+  "$id": "https://archgraph.dev/schema/project-configuration-v3.json",
   "title": "ArchGraph Project Configuration",
   "description": "Optional root .archgraph configuration consumed by archgraph-core.",
   "type": "object",
@@ -10,7 +10,8 @@
       "items": {
         "$ref": "#/$defs/glob"
       },
-      "uniqueItems": true
+      "uniqueItems": true,
+      "description": "Project-root-relative glob patterns ignored by every layer."
     },
     "layers": {
       "type": "object",
@@ -49,11 +50,13 @@
     "default_view": {
       "type": "string",
       "minLength": 1,
-      "pattern": "\\S"
+      "pattern": "\\S",
+      "description": "Application-facing default graph view name."
     },
     "view_settings": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "description": "Opaque application-owned settings transported and written by archgraph-core."
     }
   },
   "additionalProperties": false,
@@ -63,11 +66,29 @@
       "minLength": 1,
       "pattern": "^(?=.*\\S)[^\\r\\n]+$"
     },
+    "pathRoot": {
+      "type": "string",
+      "pattern": "^[^*?\\r\\n]*$",
+      "description": "Literal project-relative directory path. Empty or . normalizes to the project root; archgraph-core rejects absolute and escaping paths."
+    },
     "layer": {
       "type": "object",
       "properties": {
         "display_name": {
-          "type": "string"
+          "type": "string",
+          "description": "Application-facing layer name."
+        },
+        "path_root": {
+          "$ref": "#/$defs/pathRoot",
+          "description": "Literal directory path relative to the selected project root. Layer file and ignore globs are evaluated relative to this directory."
+        },
+        "ignored_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "uniqueItems": true,
+          "description": "Glob patterns ignored within this layer, relative to path_root."
         },
         "files": {
           "type": "array",
@@ -75,7 +96,8 @@
           "items": {
             "$ref": "#/$defs/sourceGlob"
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Candidate source globs evaluated relative to path_root. A matching file is enrolled only when it contains configured ArchGraph markers."
         },
         "markers": {
           "type": "object",
@@ -90,7 +112,8 @@
               "$ref": "#/$defs/markerList"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Concrete marker spellings accepted for this layer."
         }
       },
       "additionalProperties": false,
@@ -139,7 +162,20 @@
       "type": "object",
       "properties": {
         "display_name": {
-          "type": "string"
+          "type": "string",
+          "description": "Application-facing layer name."
+        },
+        "path_root": {
+          "$ref": "#/$defs/pathRoot",
+          "description": "Literal directory path relative to the selected project root. Layer file and ignore globs are evaluated relative to this directory."
+        },
+        "ignored_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "uniqueItems": true,
+          "description": "Glob patterns ignored within this layer, relative to path_root."
         },
         "files": {
           "type": "array",
@@ -147,7 +183,8 @@
           "items": {
             "$ref": "#/$defs/sourceGlob"
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Candidate source globs evaluated relative to path_root. A matching file is enrolled only when it contains configured ArchGraph markers."
         },
         "markers": {
           "type": "object",
@@ -162,7 +199,8 @@
               "$ref": "#/$defs/markerList"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Concrete marker spellings accepted for this layer."
         }
       },
       "additionalProperties": false

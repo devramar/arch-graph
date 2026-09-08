@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const GRAPH_FORMAT_VERSION: u32 = 1;
+pub const GRAPH_FORMAT_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +26,11 @@ pub struct ArchitectureNode {
     pub id: String,
     pub name: String,
     pub kind: NodeKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_scope: Option<ReferenceScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<SourceLocation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub documentation: Option<String>,
@@ -36,9 +40,14 @@ pub struct ArchitectureNode {
 #[serde(rename_all = "camelCase")]
 pub enum NodeKind {
     Architecture,
-    Module,
-    External,
-    Unresolved,
+    Reference,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub enum ReferenceScope {
+    Shared,
+    Local,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -50,16 +59,14 @@ pub struct ArchitectureEdge {
     pub target_name: String,
     pub description: Option<String>,
     pub source_location: SourceLocation,
-    pub resolution: EdgeResolution,
+    pub reference_kind: ReferenceKind,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
-pub enum EdgeResolution {
-    Architecture,
-    Module,
-    Unresolved,
-    Ambiguous,
+pub enum ReferenceKind {
+    Reference,
+    Subreference,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -85,9 +92,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "ARCH001")]
     DuplicateArchitectureNode,
     #[serde(rename = "ARCH002")]
-    AmbiguousDependency,
-    #[serde(rename = "ARCH003")]
-    UnresolvedDependency,
+    AmbiguousReference,
     #[serde(rename = "ARCH004")]
     MissingArchitectureNode,
     #[serde(rename = "ARCH005")]

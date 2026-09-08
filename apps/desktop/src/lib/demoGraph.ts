@@ -1,89 +1,108 @@
-import type { ArchitectureGraph } from '../types';
+import type { ProjectScan } from '../types';
 
-export const demoGraph: ArchitectureGraph = {
-    version: 1,
-    project: {
-        name: 'demo-events',
-        root: '/demo/events',
+export const demoScan: ProjectScan = {
+    configuration: {
+        aliasing: {
+            'ARCHITECTURE.md': ['ARCHITECTURE.md'],
+            ARCH_NODE: ['ARCH_NODE'],
+            ARCH_REFERENCE: ['ARCH_REFERENCE'],
+            ARCH_SUBREFERENCE: ['ARCH_SUBREFERENCE'],
+        },
+        app_colours: {
+            colour_overrides: {
+                references: {},
+                subreferences: {
+                    'Password Management': 'purple',
+                },
+            },
+        },
+        default_view: 'sticky',
+        view_settings: {
+            sticky: {
+                reference_distance: 175,
+                subreference_distance: 68,
+                subreference_attraction: 1.8,
+            },
+        },
     },
-    nodes: [
-        {
-            id: 'arch:events#Events',
-            name: 'Events',
-            kind: 'architecture',
-            source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
-            documentation: '# Events\n\nARCH_NODE:Events\n\n## Description\n\nCoordinates the event feature and its major subsystems.\n',
+    graph: {
+        version: 2,
+        project: {
+            name: 'demo-events',
+            root: '/demo/events',
         },
-        {
-            id: 'arch:sync#EventSync',
-            name: 'EventSync',
-            kind: 'architecture',
-            source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
-            documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\n## Description\n\nCoordinates synchronization of remote event-day changes with locally stored event data.\n\n## Dependencies\n\nARCH_DEPENDENCY:DateKey\n\nUsed as the canonical day representation when constructing synchronization windows.\n',
-        },
-        {
-            id: 'module:DateKey#DateKey',
-            name: 'DateKey',
-            kind: 'module',
-            source: { file: 'src/core/date/DateKey.ts', line: 1 },
-        },
-        {
-            id: 'module:EventStore#EventStore',
-            name: 'EventStore',
-            kind: 'module',
-            source: { file: 'src/features/events/storage/EventStore.ts', line: 8 },
-        },
-        {
-            id: 'unresolved:RemoteChanges',
-            name: 'RemoteChanges',
-            kind: 'unresolved',
-        },
-    ],
-    edges: [
-        {
-            id: 'edge:events:sync',
-            source: 'arch:events#Events',
-            target: 'arch:sync#EventSync',
-            targetName: 'EventSync',
-            description: 'Delegates remote reconciliation to the synchronization subsystem.',
-            sourceLocation: { file: 'src/features/events/ARCHITECTURE.md', line: 31 },
-            resolution: 'architecture',
-        },
-        {
-            id: 'edge:sync:datekey',
-            source: 'arch:sync#EventSync',
-            target: 'module:DateKey#DateKey',
-            targetName: 'DateKey',
-            description: 'Used as the canonical day representation when constructing synchronization windows.',
-            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 24 },
-            resolution: 'module',
-        },
-        {
-            id: 'edge:sync:store',
-            source: 'arch:sync#EventSync',
-            target: 'module:EventStore#EventStore',
-            targetName: 'EventStore',
-            description: 'Provides the local event state against which synchronization results are reconciled.',
-            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 28 },
-            resolution: 'module',
-        },
-        {
-            id: 'edge:sync:remote',
-            source: 'arch:sync#EventSync',
-            target: 'unresolved:RemoteChanges',
-            targetName: 'RemoteChanges',
-            description: 'Illustrates a dependency the scanner could not resolve.',
-            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 32 },
-            resolution: 'unresolved',
-        },
-    ],
-    diagnostics: [
-        {
-            code: 'ARCH003',
-            severity: 'warning',
-            message: 'Could not resolve dependency: RemoteChanges',
-            source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 32 },
-            candidates: [],
-        },
-    ],
+        nodes: [
+            {
+                id: 'arch:events#Events',
+                name: 'Events',
+                kind: 'architecture',
+                source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
+                documentation: '# Events\n\nARCH_NODE:Events\n\n## Description\n\nCoordinates the event feature and its major subsystems.\n',
+            },
+            {
+                id: 'arch:sync#EventSync',
+                name: 'EventSync',
+                kind: 'architecture',
+                source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
+                documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\n## References\n\nARCH_REFERENCE:DateKey\n\nUsed as the canonical day representation when constructing synchronization windows.\n',
+            },
+            {
+                id: 'reference:DateKey',
+                name: 'DateKey',
+                kind: 'reference',
+                referenceScope: 'shared',
+            },
+            {
+                id: 'reference:EventStore',
+                name: 'EventStore',
+                kind: 'reference',
+                referenceScope: 'shared',
+            },
+            {
+                id: 'subref:arch:sync#EventSync:2#Password Management',
+                name: 'Password Management',
+                kind: 'reference',
+                referenceScope: 'local',
+            },
+        ],
+        edges: [
+            {
+                id: 'edge:events:sync',
+                source: 'arch:events#Events',
+                target: 'arch:sync#EventSync',
+                targetName: 'EventSync',
+                description: 'Delegates remote reconciliation to the synchronization subsystem.',
+                sourceLocation: { file: 'src/features/events/ARCHITECTURE.md', line: 31 },
+                referenceKind: 'reference',
+            },
+            {
+                id: 'edge:sync:datekey',
+                source: 'arch:sync#EventSync',
+                target: 'reference:DateKey',
+                targetName: 'DateKey',
+                description: 'Used as the canonical day representation when constructing synchronization windows.',
+                sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 24 },
+                referenceKind: 'reference',
+            },
+            {
+                id: 'edge:sync:store',
+                source: 'arch:sync#EventSync',
+                target: 'reference:EventStore',
+                targetName: 'EventStore',
+                description: 'Provides the local event state against which synchronization results are reconciled.',
+                sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 28 },
+                referenceKind: 'reference',
+            },
+            {
+                id: 'edge:sync:passwords',
+                source: 'arch:sync#EventSync',
+                target: 'subref:arch:sync#EventSync:2#Password Management',
+                targetName: 'Password Management',
+                description: 'Keeps password management scoped to EventSync rather than merging it across the graph.',
+                sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 32 },
+                referenceKind: 'subreference',
+            },
+        ],
+        diagnostics: [],
+    },
 };

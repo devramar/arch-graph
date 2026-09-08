@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archgraph.dev/schema/architecture-graph-v1.json",
+  "$id": "https://archgraph.dev/schema/architecture-graph-v2.json",
   "title": "ArchGraph Architecture Graph",
   "description": "Presentation-independent serialized output of archgraph-core.",
   "type": "object",
   "required": ["version", "project", "nodes", "edges", "diagnostics"],
   "properties": {
-    "version": { "const": 1 },
+    "version": { "const": 2 },
     "project": {
       "type": "object",
       "required": ["name", "root"],
@@ -46,7 +46,8 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "kind": { "enum": ["architecture", "module", "external", "unresolved"] },
+        "kind": { "enum": ["architecture", "reference"] },
+        "referenceScope": { "enum": ["shared", "local", null] },
         "source": {
           "anyOf": [
             { "$ref": "#/$defs/sourceLocation" },
@@ -56,11 +57,20 @@
         "summary": { "type": ["string", "null"] },
         "documentation": { "type": ["string", "null"] }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "reference" } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["referenceScope"] }
+        }
+      ],
       "additionalProperties": false
     },
     "edge": {
       "type": "object",
-      "required": ["id", "source", "target", "targetName", "sourceLocation", "resolution"],
+      "required": ["id", "source", "target", "targetName", "sourceLocation", "referenceKind"],
       "properties": {
         "id": { "type": "string" },
         "source": { "type": "string" },
@@ -68,7 +78,7 @@
         "targetName": { "type": "string" },
         "description": { "type": ["string", "null"] },
         "sourceLocation": { "$ref": "#/$defs/sourceLocation" },
-        "resolution": { "enum": ["architecture", "module", "unresolved", "ambiguous"] }
+        "referenceKind": { "enum": ["reference", "subreference"] }
       },
       "additionalProperties": false
     },
@@ -76,7 +86,7 @@
       "type": "object",
       "required": ["code", "severity", "message"],
       "properties": {
-        "code": { "enum": ["ARCH001", "ARCH002", "ARCH003", "ARCH004", "ARCH005"] },
+        "code": { "enum": ["ARCH001", "ARCH002", "ARCH004", "ARCH005"] },
         "severity": { "enum": ["warning", "error"] },
         "message": { "type": "string" },
         "source": {

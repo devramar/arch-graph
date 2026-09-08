@@ -3,19 +3,20 @@
 ## Rust core
 
 `crates/archgraph-core`
-: Owns project walking, `ARCHITECTURE.md` parsing, TypeScript symbol indexing, resolution, diagnostics, and the neutral graph schema.
+: Owns root `.archgraph` configuration, architecture document discovery/parsing, explicit reference resolution, diagnostics, and the neutral graph schema.
 
 Important files:
 
-- `src/model.rs` — serialized graph contract
-- `src/parser.rs` — architecture marker and edge-description parser
-- `src/resolver.rs` — TypeScript module symbol index and target resolution
+- `src/config.rs` — configuration defaults, parsing, validation, and writes
+- `src/model.rs` — serialized graph-v2 contract
+- `src/parser.rs` — configurable marker and edge-description parser
+- `src/resolver.rs` — architecture/shared/local reference resolution
 - `src/scanner.rs` — root-confined project scan and graph assembly
 
 ## CLI
 
 `crates/archgraph-cli`
-: Thin standalone consumer that scans one root and emits graph JSON to stdout.
+: Thin standalone consumer that scans one root and emits graph JSON.
 
 ## Desktop
 
@@ -23,11 +24,12 @@ Important files:
 : React/Cytoscape frontend.
 
 `apps/desktop/src-tauri`
-: Thin Tauri adapter exposing the core scanner through one `scan_project` command and the native folder dialog.
-
-The frontend does not directly enumerate the filesystem.
+: Thin Tauri adapter exposing project scan, configuration write, and source-open commands.
 
 ## Fixtures
 
 `crates/archgraph-core/tests/fixtures/basic`
-: Small project fixture covering architecture nodes, module targets, relationship descriptions, and an unresolved dependency.
+: Proves normal references, architecture resolution, subreferences, and that matching TypeScript files are ignored.
+
+`crates/archgraph-core/tests/fixtures/aliases`
+: Proves root `.archgraph` filename/marker aliases plus configuration transport.

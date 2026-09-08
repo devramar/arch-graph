@@ -1,20 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GraphCanvas } from './components/GraphCanvas';
 import { Inspector } from './components/Inspector';
-import { Sidebar, type NodeKindFilter } from './components/Sidebar';
-import { chooseProjectFolder, desktopRuntimeAvailable, listenForProjectDrop, openProjectSource, scanProject } from './lib/desktop';
-import { demoGraph } from './lib/demoGraph';
-import type { ArchitectureGraph, GraphSelection, NodeKind, SourceLocation } from './types';
+import { Sidebar, type NodeKindFilter, type NodeFilterKind } from './components/Sidebar';
+import {
+    chooseProjectFolder,
+    desktopRuntimeAvailable,
+    listenForProjectDrop,
+    openProjectSource,
+    scanProject,
+} from './lib/desktop';
+import { demoScan } from './lib/demoGraph';
+import type { GraphSelection, ProjectScan, SourceLocation } from './types';
 
 const defaultFilters: NodeKindFilter = {
     architecture: true,
-    module: true,
-    external: true,
-    unresolved: true,
+    reference: true,
+    subreference: true,
 };
 
 export default function App() {
-    const [graph, setGraph] = useState<ArchitectureGraph | null>(null);
+    const [project, setProject] = useState<ProjectScan | null>(null);
     const [selection, setSelection] = useState<GraphSelection>(null);
     const [filters, setFilters] = useState(defaultFilters);
     const [search, setSearch] = useState('');
@@ -24,13 +29,14 @@ export default function App() {
     const [sourceOpenError, setSourceOpenError] = useState<string | null>(null);
     const searchRef = useRef<HTMLInputElement | null>(null);
     const desktop = useMemo(() => desktopRuntimeAvailable(), []);
+    const graph = project?.graph ?? null;
 
     const loadRoot = async (root: string) => {
         setLoading(true);
         setError(null);
         setSelection(null);
         try {
-            setGraph(await scanProject(root));
+            setProject(await scanProject(root));
         } catch (reason) {
             setError(reason instanceof Error ? reason.message : String(reason));
         } finally {
@@ -73,11 +79,10 @@ export default function App() {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, []);
 
-
     const openSource = (source: SourceLocation) => {
-        if (!desktop) return;
+        if (!desktop || !graph) return;
         setSourceOpenError(null);
-        void openProjectSource(graph?.project.root ?? '', source).catch((reason) => {
+        void openProjectSource(graph.project.root, source).catch((reason) => {
             const message = reason instanceof Error ? reason.message : String(reason);
             console.error('Could not open source declaration', reason);
             setSourceOpenError(message);
@@ -90,26 +95,24 @@ export default function App() {
         if (root) await loadRoot(root);
     };
 
-    if (!graph) {
+    if (!project || !graph) {
         return (
             <main className={`launch-screen ${dropHover ? 'drop-hover' : ''}`}>
                 <div className="launch-card">
                     <div className="brand-mark">AG</div>
                     <h1>ArchGraph</h1>
-                    <p>Explore explicit architectural relationships in a project.</p>
+                    <p>Explore explicit architectural references in a project.</p>
                     {desktop ? (
-                        <>
-                            <div className="drop-zone">
-                                <strong>{loading ? 'Scanning project…' : 'Drop a project folder'}</strong>
-                                <span>or</span>
-                                <button disabled={loading} onClick={openFolder}>Open Folder</button>
-                            </div>
-                        </>
+                        <div className="drop-zone">
+                            <strong>{loading ? 'Scanning project…' : 'Drop a project folder'}</strong>
+                            <span>or</span>
+                            <button disabled={loading} onClick={openFolder}>Open Folder</button>
+                        </div>
                     ) : (
                         <div className="drop-zone browser-preview">
                             <strong>Browser preview</strong>
                             <p>Folder scanning is available in the Tauri desktop runtime.</p>
-                            <button onClick={() => setGraph(demoGraph)}>Load Demo Graph</button>
+                            <button onClick={() => setProject(demoScan)}>Load Demo Graph</button>
                         </div>
                     )}
                     {error ? <div className="error-box">{error}</div> : null}
@@ -122,7 +125,7 @@ export default function App() {
         <main className={`app-shell ${dropHover ? 'drop-hover' : ''}`}>
             <header className="topbar">
                 <div className="brand"><span className="brand-mark small">AG</span><strong>ArchGraph</strong></div>
-                <button className="project-button" onClick={desktop ? openFolder : () => setGraph(null)}>
+                <button className="project-button" onClick={desktop ? openFolder : () => setProject(null)}>
                     {desktop ? 'Open Project' : 'Back'}
                 </button>
                 <div className="search-wrap">
@@ -139,10 +142,12 @@ export default function App() {
                 <Sidebar
                     graph={graph}
                     filters={filters}
-                    onFilterChange={(kind: NodeKind, enabled) => setFilters((current) => ({ ...current, [kind]: enabled }))}
+                    onFilterChange={(kind: NodeFilterKind, enabled) => setFilters((current) => ({ ...current, [kind]: enabled }))}
                 />
                 <GraphCanvas
+                    key={`${graph.project.root}:${project.configuration.default_view ?? ''}`}
                     graph={graph}
+                    configuration={project.configuration}
                     filters={filters}
                     search={search}
                     selection={selection}
@@ -160,7 +165,7 @@ export default function App() {
             ) : null}
             <footer className="statusbar">
                 <span>{graph.nodes.length} nodes</span>
-                <span>{graph.edges.length} relationships</span>
+                <span>{graph.edges.length} references</span>
                 <span>{graph.diagnostics.length} diagnostics</span>
                 <span className="status-spacer" />
                 <span>Left / middle / Space + drag to pan</span>

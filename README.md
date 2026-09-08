@@ -1,15 +1,16 @@
 # ArchGraph
 
-ArchGraph is an offline vibe coded desktop tool for exploring a codebase as an architecture graph.
+ArchGraph is an offline desktop tool for exploring explicitly authored architecture as a graph.
 
-I didn't want to spend time making this nice. This is basically a prototype application for me.
-
-Projects describe important systems with lightweight `ARCHITECTURE.md` files. ArchGraph scans those documents, resolves their declared dependencies, and renders the result as an interactive graph.
+Projects describe important systems with lightweight architecture documents. By default these are named `ARCHITECTURE.md`, but a root `.archgraph` file can replace the accepted document names and marker tokens.
 
 ```text
 ARCH_NODE:EventSync
-ARCH_DEPENDENCY:DateKey
+ARCH_REFERENCE:EventStore
+ARCH_SUBREFERENCE:Password Management
 ```
+
+ArchGraph does not infer architecture from imports, exports, or programming-language syntax. A normal reference connects to a matching documented architecture node when one exists; otherwise it becomes a valid lightweight shared reference node. A subreference is always local to the declaring architecture node and never merges by name.
 
 The Rust scanner is standalone and produces a neutral graph model. The desktop app is a Tauri + React + Cytoscape.js viewer for that model.
 
@@ -28,8 +29,6 @@ Linux additionally needs the WebKitGTK/GTK development packages required by Taur
 
 ### 2. Install frontend dependencies
 
-From the repository root:
-
 ```bash
 cd apps/desktop
 npm install
@@ -42,8 +41,6 @@ cd ../..
 ./scripts/check.sh
 ```
 
-This runs the Rust workspace tests and the frontend production build.
-
 ### 4. Run in development
 
 ```bash
@@ -53,66 +50,50 @@ npm run tauri dev
 
 ### 5. Build a release
 
-For the current machine:
-
 ```bash
 ./scripts/build.sh native
 ```
 
-The native Linux executable is produced at:
+See [`scripts/README.md`](scripts/README.md) for platform-specific build commands.
 
-```text
-target/release/archgraph-desktop
+## `.archgraph`
+
+A root `.archgraph` file is optional. Missing fields use ArchGraph defaults; configured alias lists replace the default spelling for that concept.
+
+```json
+{
+  "aliasing": {
+    "ARCHITECTURE.md": ["DOCUMENTATION.md"],
+    "ARCH_NODE": ["SYS_NODE"],
+    "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
+    "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
+  },
+  "app_colours": {
+    "colour_overrides": {
+      "references": {
+        "Identity": "purple"
+      },
+      "subreferences": {
+        "Password Management": "teal"
+      }
+    }
+  },
+  "default_view": "sticky",
+  "view_settings": {
+    "sticky": {
+      "reference_distance": 175,
+      "subreference_distance": 68,
+      "subreference_attraction": 1.8
+    }
+  }
+}
 ```
 
-Platform-specific builds are also available:
-
-```bash
-./scripts/build.sh linux x86_64
-./scripts/build.sh windows x86_64
-./scripts/build.sh macos universal
-./scripts/build.sh core
-```
-
-See [`scripts/README.md`](scripts/README.md) for the full build guide.
-
-## Try ArchGraph on this repository
-
-This repository contains its own `ARCHITECTURE.md` files, so it can be used as a sample project.
-
-1. Build or run ArchGraph.
-2. Open the desktop app.
-3. Drag the **repository root folder** into the window.
-4. Explore the resulting architecture graph.
-
-See [`EXAMPLE_USAGE.md`](EXAMPLE_USAGE.md) for a complete clone → build → scan walkthrough.
-
-## Linux local installation
-
-After `./scripts/build.sh native`:
-
-```bash
-./scripts/install.sh
-```
-
-After rebuilding a newer version:
-
-```bash
-./scripts/update.sh
-```
-
-To remove the installed copy:
-
-```bash
-./scripts/uninstall.sh
-```
-
-These scripts install only for the current user under `~/.local` and do not require `sudo`.
+`view_settings` is intentionally application-defined data transported by the Rust core. The desktop currently understands `reference_distance`, `subreference_distance`, `node_spacing`, and `subreference_attraction` for its layouts.
 
 ## Documentation
 
 - [`EXAMPLE_USAGE.md`](EXAMPLE_USAGE.md) — first-use walkthrough
-- [`scripts/README.md`](scripts/README.md) — build targets and scripts
-- [`RUNNING.md`](RUNNING.md) — development and runtime notes
-- [`docs/00 - Home.md`](docs/00%20-%20Home.md) — architecture documentation index
-- [`docs/20 - Documentation/ARCHITECTURE Format.md`](docs/20%20-%20Documentation/ARCHITECTURE%20Format.md) — how to document a project for ArchGraph
+- [`docs/architecture vault/20 - Documentation/ARCHITECTURE Format.md`](docs/architecture%20vault/20%20-%20Documentation/ARCHITECTURE%20Format.md) — architecture document format
+- [`docs/architecture vault/20 - Documentation/Project Configuration.md`](docs/architecture%20vault/20%20-%20Documentation/Project%20Configuration.md) — `.archgraph` configuration
+- [`docs/HANDOVER.md`](docs/HANDOVER.md) — validation handover for this refactor

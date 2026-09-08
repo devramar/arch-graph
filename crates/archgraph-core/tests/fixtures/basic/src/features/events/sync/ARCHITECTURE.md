@@ -2,16 +2,20 @@
 
 ARCH_NODE:EventSync
 
-## Dependencies
+## References
 
-ARCH_DEPENDENCY:DateKey
+ARCH_REFERENCE:DateKey
 
 Used as the canonical day representation when constructing synchronization windows.
 
-ARCH_DEPENDENCY:EventStore
+ARCH_REFERENCE:EventStore
 
 Provides the local event state against which synchronization results are reconciled.
 
-ARCH_DEPENDENCY:RemoteChanges
+ARCH_REFERENCE:RemoteChanges
 
-Represents a deliberately unresolved dependency for fixture coverage.
+Delegates remote change collection to the documented remote changes subsystem.
+
+ARCH_SUBREFERENCE:Password Management
+
+Represents password handling that belongs only to this architecture node.

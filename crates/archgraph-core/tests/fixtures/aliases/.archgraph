@@ -1,0 +1,40 @@
+{
+  "ignored_paths": ["ignored/**"],
+  "layers": {
+    "architecture": {
+      "display_name": "Architecture",
+      "files": ["DOCUMENTATION.md"],
+      "markers": {
+        "ARCH_NODE": ["SYS_NODE"],
+        "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
+        "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
+      }
+    },
+    "implementation": {
+      "display_name": "Implementation",
+      "files": ["*.ts"],
+      "markers": {
+        "ARCH_NODE": ["ARCH_NODE"],
+        "ARCH_REFERENCE": ["ARCH_REFERENCE"],
+        "ARCH_SUBREFERENCE": ["ARCH_SUBREFERENCE"]
+      }
+    }
+  },
+  "app_colours": {
+    "colour_overrides": {
+      "references": {
+        "Identity": "purple"
+      },
+      "subreferences": {
+        "Password Management": "teal"
+      }
+    }
+  },
+  "default_view": "sticky",
+  "view_settings": {
+    "sticky": {
+      "reference_distance": 190,
+      "subreference_distance": 72
+    }
+  }
+}

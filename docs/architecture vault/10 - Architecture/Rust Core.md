@@ -2,62 +2,33 @@
 
 ## Responsibility
 
-The Rust core owns project scanning and graph construction.
+The Rust core owns project scanning, `.archgraph` configuration, source discovery/parsing, layer construction, group composition, diagnostics, and configuration writes.
 
-It must not depend on the desktop application.
-
-## Inputs
-
-Primary input:
-
-- a project root directory
-
-The core scans within that root for relevant architecture documents and source files.
-
-## Outputs
-
-Primary output:
-
-- a neutral architecture graph data structure
-
-The same data should be serializable as JSON so any external program can consume it.
-
-See [[Core Graph Model]].
+It does not depend on the desktop application or any programming language.
 
 ## Core operations
 
-1. Walk the project tree.
-2. Find `ARCHITECTURE.md` files.
-3. Parse `ARCH_NODE:` declarations.
-4. Parse `ARCH_DEPENDENCY:` declarations and their descriptions.
-5. Index resolvable TypeScript modules and exported symbols.
-6. Resolve dependency names.
-7. Produce graph nodes, edges, and diagnostics.
+1. Validate and canonicalize the project root.
+2. Read root `.archgraph` if present.
+3. Normalize layers, markers, ignored paths, colour/view settings.
+4. Walk the project tree without following symlinks.
+5. Apply built-in ignores, Git ignores, `.archgraphignore`, and configured `ignored_paths`.
+6. Match files against per-layer globs.
+7. Skip files matching multiple layers with `ARCH007`.
+8. Parse Markdown sources with the Markdown parser; parse all other source types with decorated-text semantics.
+9. Ignore candidate sources that contain no markers.
+10. Build one graph per layer.
+11. Compose supplied layer groups with core-owned name matching.
+12. Return graph/layers/configuration state to consumers.
 
-## Filesystem boundaries
+## Source-language independence
 
-The scanner receives one explicit root.
+The decorated parser recognizes a punctuation decoration prefix before configured markers, for example `///`, `#`, `--`, or `*`. It strips the same prefix from adjacent declaration/reference prose.
 
-It must not intentionally read outside that root.
+This is lexical annotation handling, not TypeScript/Rust/Python/etc. parsing.
 
-Symlinks should not be followed by default.
+## Configuration writes
 
-## TypeScript resolution
+Consumers submit typed `ProjectConfiguration` values to the core. The core validates and normalizes them, writes completed strict JSON to a temporary file, then replaces root `.archgraph`.
 
-For the first version, TypeScript parsing exists to resolve explicitly documented dependencies such as:
-
-```text
-ARCH_DEPENDENCY:DateKey
-```
-
-It should not automatically convert every TypeScript import into an architecture edge.
-
-## Standalone use
-
-A future CLI should be able to expose the same engine, for example:
-
-```text
-archgraph scan ./project --json
-```
-
-The exact CLI syntax is not yet fixed.
+`view_settings` remains opaque application JSON. Rust transports it without understanding desktop-specific layer-group or layout keys.

@@ -1,89 +1,135 @@
-import type { ArchitectureGraph } from '../types';
+import type { ProjectScan } from '../types';
 
-export const demoGraph: ArchitectureGraph = {
-    version: 1,
-    project: {
-        name: 'demo-events',
-        root: '/demo/events',
-    },
+const project = {
+    name: 'demo-events',
+    root: '/demo/events',
+};
+
+const graph = {
+    version: 3,
+    project,
+    groups: [
+        { id: 'all', name: 'Architecture', layerIds: ['architecture'] },
+    ],
     nodes: [
         {
-            id: 'arch:events#Events',
+            id: 'group:all:architecture:Events',
             name: 'Events',
-            kind: 'architecture',
-            source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
-            documentation: '# Events\n\nARCH_NODE:Events\n\n## Description\n\nCoordinates the event feature and its major subsystems.\n',
+            kind: 'architecture' as const,
+            groupId: 'all',
+            declarations: [
+                {
+                    layerId: 'architecture',
+                    layerName: 'Architecture',
+                    source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
+                    documentation: '# Events\n\nARCH_NODE:Events\n\nCoordinates the event feature and its major subsystems.\n',
+                    sourceFormat: 'markdown' as const,
+                },
+            ],
         },
         {
-            id: 'arch:sync#EventSync',
+            id: 'group:all:architecture:EventSync',
             name: 'EventSync',
-            kind: 'architecture',
-            source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
-            documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\n## Description\n\nCoordinates synchronization of remote event-day changes with locally stored event data.\n\n## Dependencies\n\nARCH_DEPENDENCY:DateKey\n\nUsed as the canonical day representation when constructing synchronization windows.\n',
+            kind: 'architecture' as const,
+            groupId: 'all',
+            declarations: [
+                {
+                    layerId: 'architecture',
+                    layerName: 'Architecture',
+                    source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
+                    documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\nARCH_REFERENCE:DateKey\n\nUsed as the canonical day representation.\n',
+                    sourceFormat: 'markdown' as const,
+                },
+            ],
         },
         {
-            id: 'module:DateKey#DateKey',
+            id: 'group:all:reference:DateKey',
             name: 'DateKey',
-            kind: 'module',
-            source: { file: 'src/core/date/DateKey.ts', line: 1 },
+            kind: 'reference' as const,
+            groupId: 'all',
+            referenceScope: 'shared' as const,
+            declarations: [],
         },
         {
-            id: 'module:EventStore#EventStore',
-            name: 'EventStore',
-            kind: 'module',
-            source: { file: 'src/features/events/storage/EventStore.ts', line: 8 },
-        },
-        {
-            id: 'unresolved:RemoteChanges',
-            name: 'RemoteChanges',
-            kind: 'unresolved',
+            id: 'group:all:subref:architecture:passwords',
+            name: 'Password Management',
+            kind: 'reference' as const,
+            groupId: 'all',
+            referenceScope: 'local' as const,
+            declarations: [],
         },
     ],
     edges: [
         {
-            id: 'edge:events:sync',
-            source: 'arch:events#Events',
-            target: 'arch:sync#EventSync',
+            id: 'group:all:architecture:events-sync',
+            source: 'group:all:architecture:Events',
+            target: 'group:all:architecture:EventSync',
             targetName: 'EventSync',
+            groupId: 'all',
+            layerId: 'architecture',
             description: 'Delegates remote reconciliation to the synchronization subsystem.',
-            sourceLocation: { file: 'src/features/events/ARCHITECTURE.md', line: 31 },
-            resolution: 'architecture',
+            sourceLocation: { file: 'src/features/events/ARCHITECTURE.md', line: 12 },
+            referenceKind: 'reference' as const,
         },
         {
-            id: 'edge:sync:datekey',
-            source: 'arch:sync#EventSync',
-            target: 'module:DateKey#DateKey',
+            id: 'group:all:architecture:sync-datekey',
+            source: 'group:all:architecture:EventSync',
+            target: 'group:all:reference:DateKey',
             targetName: 'DateKey',
+            groupId: 'all',
+            layerId: 'architecture',
             description: 'Used as the canonical day representation when constructing synchronization windows.',
-            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 24 },
-            resolution: 'module',
+            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 8 },
+            referenceKind: 'reference' as const,
         },
         {
-            id: 'edge:sync:store',
-            source: 'arch:sync#EventSync',
-            target: 'module:EventStore#EventStore',
-            targetName: 'EventStore',
-            description: 'Provides the local event state against which synchronization results are reconciled.',
-            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 28 },
-            resolution: 'module',
-        },
-        {
-            id: 'edge:sync:remote',
-            source: 'arch:sync#EventSync',
-            target: 'unresolved:RemoteChanges',
-            targetName: 'RemoteChanges',
-            description: 'Illustrates a dependency the scanner could not resolve.',
-            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 32 },
-            resolution: 'unresolved',
+            id: 'group:all:architecture:sync-passwords',
+            source: 'group:all:architecture:EventSync',
+            target: 'group:all:subref:architecture:passwords',
+            targetName: 'Password Management',
+            groupId: 'all',
+            layerId: 'architecture',
+            description: 'Keeps password management scoped to EventSync.',
+            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 12 },
+            referenceKind: 'subreference' as const,
         },
     ],
-    diagnostics: [
+    diagnostics: [],
+};
+
+export const demoScan: ProjectScan = {
+    configuration: {
+        ignored_paths: [],
+        layers: {
+            architecture: {
+                display_name: 'Architecture',
+                files: ['ARCHITECTURE.md'],
+                markers: {
+                    ARCH_NODE: ['ARCH_NODE'],
+                    ARCH_REFERENCE: ['ARCH_REFERENCE'],
+                    ARCH_SUBREFERENCE: ['ARCH_SUBREFERENCE'],
+                },
+            },
+        },
+        app_colours: {
+            colour_overrides: {
+                references: {},
+                subreferences: {
+                    'Password Management': 'purple',
+                },
+            },
+        },
+        default_view: 'sticky',
+        view_settings: {},
+    },
+    configurationExists: false,
+    diagnostics: [],
+    layers: [
         {
-            code: 'ARCH003',
-            severity: 'warning',
-            message: 'Could not resolve dependency: RemoteChanges',
-            source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 32 },
-            candidates: [],
+            id: 'architecture',
+            displayName: 'Architecture',
+            graph,
         },
     ],
+    graph,
 };

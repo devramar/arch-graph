@@ -1,68 +1,46 @@
 # Interaction Model
 
-## Input philosophy
+## Layer groups
 
-The application is optimized for mouse and keyboard use on a desktop.
+Each discovered layer appears in exactly one desktop group.
 
-## Panning
+- drag a layer onto another group → merge their matching names
+- drag a layer onto the new-group drop area → split it into its own group
+- uncheck a group → hide the entire region
+- keep several groups enabled → view them simultaneously
 
-All of the following pan the graph:
+Each enabled group renders as a soft labeled rectangle/region. The graph layout packs independent regions apart for clarity.
 
-- left mouse drag on empty graph space
-- middle mouse drag
-- Space + drag
+## Merged nodes
 
-Directly dragging a node moves the node unless Space is held.
+When several layers in one group declare the same unique name, the graph contains one architecture node with multiple declarations.
 
-## Zoom
+The inspector renders one tab per declaration, labelled by layer display name. Each tab has its own source path and documentation.
 
-Mouse wheel controls graph zoom at a deliberately strong desktop sensitivity.
+## Persistence
 
-Shift + wheel applies a larger zoom step while preserving the cursor as the zoom focal point.
+A project without `.archgraph` is session-only. Grouping and layout changes do not touch the project filesystem.
 
-## Selection
+The sidebar action `Create .archgraph · save this session` creates root configuration through the Rust core and enables future persistence.
 
-Single click selects a node or relationship.
+## Panning and zoom
 
-Selection styling must not alter node geometry.
+- left mouse drag on empty graph space — pan
+- middle mouse drag — pan
+- Space + drag — pan
+- mouse wheel — zoom
+- Shift + wheel — stronger zoom
 
-## Declarations
+Direct node drag remains available.
 
-Nodes with source declarations and relationships with declaration locations can be opened with the operating system's default application.
+## Reference interaction
 
-Access is available from:
+Hovering an edge shows its source, target, and edge-owned reference description. Selecting a reference node explains whether it is an undocumented shared reference or declaration-local subreference.
 
-- right-click context menu on a graph element
-- **Open in editor** beside Source/Declaration in the inspector
+## Layouts
 
-The desktop adapter validates that the requested file remains inside the currently selected project root before opening it.
+- **Directed** — left-to-right hierarchical
+- **Organic** — force-directed fCoSE
+- **Sticky** — force-directed with incremental settling after manual repositioning
 
-## Relationship hover
-
-Hovering a relationship shows a cursor-following preview containing:
-
-- source node
-- target node
-- dependency description
-
-An optional **Descriptions** panel at the bottom of the graph presents the same documentation in a larger stable surface. It follows the hovered relationship and falls back to the selected relationship when nothing is hovered.
-
-## Search
-
-Search should support finding nodes by canonical name and rapidly isolating their local dependency neighborhood.
-
-## Keyboard interactions
-
-- `/` focuses search
-- `Esc` clears current selection/context menu
-- `F` fits the visible graph
-- `Space + drag` pans
-- `Shift + wheel` zooms faster
-
-## Layout
-
-Three layout modes are available:
-
-- **Dependency** — hierarchical directed layout
-- **Organic** — force-directed fCoSE layout
-- **Sticky** — fCoSE layout that performs an incremental settling pass after a node is manually repositioned, approximating the sticky/simulation behavior of tools such as Obsidian graph view
+Subreferences use shorter ideal edge lengths and stronger attraction than normal references.

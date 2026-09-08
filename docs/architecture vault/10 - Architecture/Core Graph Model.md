@@ -2,87 +2,78 @@
 
 ## Goal
 
-The core graph format must be independent of Cytoscape.js, Tauri, React, and any other presentation layer.
+The core graph format is independent of Cytoscape.js, Tauri, React, source languages, and presentation choices.
 
-## Project
-
-Conceptually:
+Graph format version `3` adds declaration provenance and layer-composition groups.
 
 ```ts
-interface ArchitectureGraph
-{
-    version: number;
+interface ArchitectureGraph {
+    version: 3;
     project: ProjectInfo;
+    groups: GraphGroup[];
     nodes: ArchitectureNode[];
     edges: ArchitectureEdge[];
     diagnostics: Diagnostic[];
 }
 ```
 
-This is illustrative rather than a frozen schema.
+## Architecture declarations
+
+An architecture node may be backed by one or more declarations:
+
+```ts
+interface ArchitectureDeclaration {
+    layerId: string;
+    layerName: string;
+    source: SourceLocation;
+    documentation?: string;
+    sourceFormat: 'markdown' | 'decoratedText';
+}
+```
+
+A merged node therefore retains every contributing source rather than selecting one winner.
 
 ## Node kinds
 
 ### Architecture
 
-A documented subsystem declared by an `ARCH_NODE:` marker.
+A named architectural concept established by an explicit configured node marker.
 
-### Module
+Within one composition group, matching names from different layers merge when each contributing layer has a unique declaration for that name.
 
-A concise code module or exported symbol that is useful as a dependency target but does not need its own architecture document.
+### Reference
 
-Example:
+A lightweight explicitly named concept with no unique architecture target in its group.
 
-```text
-DateKey
-```
+Reference scopes:
 
-### External
+- `shared` — normal references merge by explicit name inside the group.
+- `local` — subreferences remain unique to their declaring source.
 
-A dependency outside the scanned project.
+Missing architecture declarations are normal for shared reference nodes.
 
-Examples may include frameworks, libraries, or external services.
+## Groups
 
-### Unresolved
+Every graph node/edge belongs to a composition `groupId`.
 
-A named dependency that could not be resolved uniquely.
+Layers inside one group participate in name matching. Different groups are isolated semantic namespaces and may be rendered simultaneously.
 
-Unresolved nodes are preserved so the graph remains inspectable even when documentation contains errors.
+## Edges
 
-## Edge
+Every edge is explicitly authored and has:
 
-An edge represents an intentionally documented dependency.
-
-Conceptually:
-
-```ts
-interface ArchitectureEdge
-{
-    source: NodeId;
-    target: NodeId;
-
-    description?: string;
-
-    sourceFile: string;
-    sourceLine?: number;
-}
-```
-
-The description belongs to the relationship.
-
-For example:
-
-```text
-EventSync ──uses DateKey to define sync windows──▶ DateKey
-```
+- `referenceKind`: `reference` or `subreference`
+- `layerId`: layer containing the source declaration
+- `groupId`: composition group in which the edge was materialized
+- edge-owned description and source location
 
 ## Diagnostics
 
-Diagnostics should report issues without preventing all useful graph output.
+Current codes:
 
-Examples:
-
-- ambiguous dependency
-- unresolved dependency
-- duplicate architecture node name
-- malformed marker
+- `ARCH001` duplicate architecture-node name inside one layer
+- `ARCH002` ambiguous reference
+- `ARCH004` marker-bearing source without a node marker
+- `ARCH005` malformed/empty marker
+- `ARCH006` more than one architecture node marker in one source
+- `ARCH007` source matched more than one configured layer

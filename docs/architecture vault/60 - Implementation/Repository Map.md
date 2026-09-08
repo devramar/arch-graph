@@ -3,31 +3,33 @@
 ## Rust core
 
 `crates/archgraph-core`
-: Owns project walking, `ARCHITECTURE.md` parsing, TypeScript symbol indexing, resolution, diagnostics, and the neutral graph schema.
+: Owns `.archgraph`, source discovery, parser dispatch, per-layer scans, explicit reference resolution, group composition, diagnostics, and graph schema.
 
 Important files:
 
-- `src/model.rs` — serialized graph contract
-- `src/parser.rs` — architecture marker and edge-description parser
-- `src/resolver.rs` — TypeScript module symbol index and target resolution
-- `src/scanner.rs` — root-confined project scan and graph assembly
+- `src/config.rs` — layers, globs, ignored paths, markers, app configuration, writes
+- `src/model.rs` — graph-v3, declaration, layer, and composition contracts
+- `src/parser.rs` — Markdown/decorated-text parser dispatch
+- `src/resolver.rs` — per-layer reference/subreference resolution
+- `src/scanner.rs` — traversal, simple glob matcher, layer scans, group composition
 
 ## CLI
 
 `crates/archgraph-cli`
-: Thin standalone consumer that scans one root and emits graph JSON to stdout.
+: Thin standalone consumer that scans one root and emits the default all-layer graph JSON.
 
 ## Desktop
 
 `apps/desktop`
-: React/Cytoscape frontend.
+: React/Cytoscape frontend with layer-group UI, regions, declaration tabs, search/filter/layout interaction.
 
 `apps/desktop/src-tauri`
-: Thin Tauri adapter exposing the core scanner through one `scan_project` command and the native folder dialog.
-
-The frontend does not directly enumerate the filesystem.
+: Thin Tauri adapter exposing scan, compose, configuration-write, and source-open commands.
 
 ## Fixtures
 
 `crates/archgraph-core/tests/fixtures/basic`
-: Small project fixture covering architecture nodes, module targets, relationship descriptions, and an unresolved dependency.
+: Proves canonical Markdown declarations and that ordinary `.ts` files remain irrelevant without an implementation layer.
+
+`crates/archgraph-core/tests/fixtures/aliases`
+: Proves layers, file globs, per-layer marker aliases, ignored paths, decorated TypeScript annotations, cross-layer name merging, colours, and view configuration.

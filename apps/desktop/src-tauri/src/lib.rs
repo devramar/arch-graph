@@ -1,12 +1,34 @@
 use std::path::PathBuf;
 
-use archgraph_core::ArchitectureGraph;
+use archgraph_core::{
+    ArchitectureGraph, ArchitectureLayer, Diagnostic, LayerGroup, ProjectConfiguration,
+    ProjectInfo, ProjectScan,
+};
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
-fn scan_project(root: String) -> Result<ArchitectureGraph, String> {
-    archgraph_core::scan_project(root).map_err(|error| error.to_string())
+fn scan_project(root: String) -> Result<ProjectScan, String> {
+    archgraph_core::scan_project_state(root).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn compose_project_layers(
+    project: ProjectInfo,
+    layers: Vec<ArchitectureLayer>,
+    diagnostics: Vec<Diagnostic>,
+    groups: Vec<LayerGroup>,
+) -> ArchitectureGraph {
+    archgraph_core::compose_project_layers(project, &layers, &diagnostics, &groups)
+}
+
+#[tauri::command]
+fn update_project_configuration(
+    root: String,
+    configuration: ProjectConfiguration,
+) -> Result<ProjectConfiguration, String> {
+    archgraph_core::write_project_configuration(root, &configuration)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -28,7 +50,9 @@ fn open_project_source(app: AppHandle, root: String, file: String) -> Result<(),
 
     app.opener()
         .open_path(requested.to_string_lossy().to_string(), None::<String>)
-        .map_err(|error| format!("Could not open declaration with the system default application: {error}"))
+        .map_err(|error| {
+            format!("Could not open declaration with the system default application: {error}")
+        })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -36,7 +60,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![scan_project, open_project_source])
+        .invoke_handler(tauri::generate_handler![
+            scan_project,
+            compose_project_layers,
+            update_project_configuration,
+            open_project_source
+        ])
         .run(tauri::generate_context!())
         .expect("error while running ArchGraph");
 }

@@ -1,118 +1,146 @@
 # ArchGraph
 
-ArchGraph is an offline vibe coded desktop tool for exploring a codebase as an architecture graph.
+ArchGraph is an offline desktop tool for exploring explicitly authored architecture as a graph.
 
-I didn't want to spend time making this nice. This is basically a prototype application for me.
+Its core rule is simple:
 
-Projects describe important systems with lightweight `ARCHITECTURE.md` files. ArchGraph scans those documents, resolves their declared dependencies, and renders the result as an interactive graph.
+> ArchGraph understands explicit architecture declarations and references, not programming languages.
+
+By default, ArchGraph scans `ARCHITECTURE.md` files for:
 
 ```text
 ARCH_NODE:EventSync
-ARCH_DEPENDENCY:DateKey
+ARCH_REFERENCE:EventStore
+ARCH_SUBREFERENCE:Password Management
 ```
 
-The Rust scanner is standalone and produces a neutral graph model. The desktop app is a Tauri + React + Cytoscape.js viewer for that model.
+A normal reference connects to a matching declared architecture node when one exists. Otherwise it becomes a valid lightweight shared reference node. A subreference is always local to its declaring node and never merges by name.
+
+A root `.archgraph` file can add logical **layers**, file globs, marker aliases, ignored paths, colour overrides, and app-specific view settings. This lets a repository describe both broad architecture and implementation-level concepts without ArchGraph needing TypeScript/Rust/Python/etc. support.
+
+## Sources and layers
+
+Every matching file is only a **candidate**. A candidate with no ArchGraph markers is ignored silently.
+
+Markdown files (`.md` / `.markdown`) use the Markdown parser. Other file types use the decorated-text parser. For example, an implementation layer can enrol `*.ts` files while only annotated files become graph nodes:
+
+```ts
+/// ARCH_NODE:DateKey
+///
+/// Handles dates in string form "YYYY-MM-DD".
+///
+/// ARCH_REFERENCE:Clock
+/// Used when determining today.
+export type DateKey = `${number}-${number}-${number}`;
+```
+
+The decoration prefix is discovered lexically (`///`, `#`, `--`, `*`, etc.). ArchGraph does not parse the surrounding language.
+
+One source file may declare at most one `ARCH_NODE` in this version.
 
 ## Quick start
 
-### 1. Requirements
-
-You need:
+### Requirements
 
 - Rust with `cargo`
 - Node.js 22+
 - npm
-- the normal Tauri 2 prerequisites for your operating system
+- normal Tauri 2 prerequisites for your operating system
 
 Linux additionally needs the WebKitGTK/GTK development packages required by Tauri.
 
-### 2. Install frontend dependencies
-
-From the repository root:
+### Install and validate
 
 ```bash
 cd apps/desktop
 npm install
 cd ../..
-```
-
-### 3. Validate the project
-
-```bash
 ./scripts/check.sh
 ```
 
-This runs the Rust workspace tests and the frontend production build.
-
-### 4. Run in development
+### Run
 
 ```bash
 cd apps/desktop
 npm run tauri dev
 ```
 
-### 5. Build a release
-
-For the current machine:
+### Build
 
 ```bash
 ./scripts/build.sh native
 ```
 
-The native Linux executable is produced at:
+See [`scripts/README.md`](scripts/README.md) for platform-specific build commands.
 
-```text
-target/release/archgraph-desktop
+## `.archgraph`
+
+`.archgraph` is optional strict JSON. Without it, ArchGraph uses the built-in `architecture` layer and the desktop treats view/group changes as session-only state.
+
+```json
+{
+  "ignored_paths": [
+    "crates/archgraph-core/tests/fixtures/**",
+    "**/generated/**"
+  ],
+  "layers": {
+    "architecture": {
+      "display_name": "Architecture",
+      "files": ["DOCUMENTATION.md"],
+      "markers": {
+        "ARCH_NODE": ["SYS_NODE"],
+        "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
+        "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
+      }
+    },
+    "implementation": {
+      "display_name": "Implementation",
+      "files": ["*.ts", "*.tsx"]
+    }
+  },
+  "app_colours": {
+    "colour_overrides": {
+      "references": {
+        "Identity": "purple"
+      },
+      "subreferences": {
+        "Password Management": "teal"
+      }
+    }
+  },
+  "default_view": "sticky",
+  "view_settings": {
+    "sticky": {
+      "reference_distance": 175,
+      "subreference_distance": 68,
+      "subreference_attraction": 1.8
+    }
+  }
+}
 ```
 
-Platform-specific builds are also available:
+The `architecture` layer always exists. If it is omitted from `.archgraph`, canonical `ARCHITECTURE.md` discovery is restored automatically. Additional layers must declare at least one file glob.
 
-```bash
-./scripts/build.sh linux x86_64
-./scripts/build.sh windows x86_64
-./scripts/build.sh macos universal
-./scripts/build.sh core
-```
+File patterns support simple path globs: `*`, `?`, and `**`. A source matching more than one layer is skipped with `ARCH007` rather than being assigned arbitrarily.
 
-See [`scripts/README.md`](scripts/README.md) for the full build guide.
+`ignored_paths` combines with ArchGraph's built-in exclusions, Git ignore rules, and `.archgraphignore`.
 
-## Try ArchGraph on this repository
+`view_settings` is intentionally application-defined data transported by the Rust core. The desktop currently understands layout tuning plus its persisted layer-group session state.
 
-This repository contains its own `ARCHITECTURE.md` files, so it can be used as a sample project.
+## Desktop layer groups
 
-1. Build or run ArchGraph.
-2. Open the desktop app.
-3. Drag the **repository root folder** into the window.
-4. Explore the resulting architecture graph.
+The desktop can show several layer groups simultaneously. Each enabled group gets a soft graph region.
 
-See [`EXAMPLE_USAGE.md`](EXAMPLE_USAGE.md) for a complete clone → build → scan walkthrough.
-
-## Linux local installation
-
-After `./scripts/build.sh native`:
-
-```bash
-./scripts/install.sh
-```
-
-After rebuilding a newer version:
-
-```bash
-./scripts/update.sh
-```
-
-To remove the installed copy:
-
-```bash
-./scripts/uninstall.sh
-```
-
-These scripts install only for the current user under `~/.local` and do not require `sudo`.
+- Layers in the **same** group merge matching node names.
+- Layers in **different** groups remain separate and can be viewed at the same time.
+- Merged nodes keep every source declaration; the inspector displays them as tabs.
+- Dragging a layer onto another group merges them. Dragging it onto the "new group" drop target splits it again.
+- If `.archgraph` exists, grouping and layout changes are persisted in `view_settings` / `default_view`.
+- If `.archgraph` does not exist, the desktop is session-only until **Create `.archgraph` · save this session** is used.
 
 ## Documentation
 
 - [`EXAMPLE_USAGE.md`](EXAMPLE_USAGE.md) — first-use walkthrough
-- [`scripts/README.md`](scripts/README.md) — build targets and scripts
-- [`RUNNING.md`](RUNNING.md) — development and runtime notes
-- [`docs/00 - Home.md`](docs/00%20-%20Home.md) — architecture documentation index
-- [`docs/20 - Documentation/ARCHITECTURE Format.md`](docs/20%20-%20Documentation/ARCHITECTURE%20Format.md) — how to document a project for ArchGraph
+- [`docs/architecture vault/20 - Documentation/ARCHITECTURE Format.md`](docs/architecture%20vault/20%20-%20Documentation/ARCHITECTURE%20Format.md) — declaration/reference format
+- [`docs/architecture vault/20 - Documentation/Project Configuration.md`](docs/architecture%20vault/20%20-%20Documentation/Project%20Configuration.md) — `.archgraph` configuration
+- [`docs/HANDOVER.md`](docs/HANDOVER.md) — validation handover for the current change set

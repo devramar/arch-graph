@@ -2,47 +2,53 @@
 
 ## Required
 
-- standalone Rust scanning core
-- neutral graph model
+- standalone Rust scanning/composition core
+- neutral schema-v3 graph model
 - JSON serialization
-- desktop Tauri application
-- drag/drop project root
-- folder picker
-- recursive project scan
-- locate `ARCHITECTURE.md`
-- parse `ARCH_NODE:`
-- parse `ARCH_DEPENDENCY:`
-- preserve dependency descriptions
-- resolve architecture-to-architecture dependencies
-- resolve useful TypeScript module/export targets
-- diagnostics for unresolved and ambiguous dependencies
-- Cytoscape.js graph rendering
-- edge hover descriptions
-- selectable nodes and edges
-- right-side inspector
-- search
-- node-kind filters
-- automatic graph layout
-- fully offline normal operation
+- optional root `.archgraph`
+- root-scoped logical layers
+- per-layer file globs and marker aliases
+- ignored-path globs
+- Markdown source parser
+- generic decorated-text source parser
+- one source → at most one node declaration
+- independently scanned layer graphs
+- core-owned layer-group composition
+- multi-declaration merged architecture nodes
+- explicit shared references
+- explicit non-merging local subreferences
+- no programming-language semantic parsing
+- Rust-owned `.archgraph` read/validate/write path
+- desktop drag/drop project opening
+- desktop drag/drop layer grouping
+- simultaneous visible group regions
+- inspector tabs for merged declarations
+- session-only mode without `.archgraph`
+- persisted desktop grouping/layout when `.archgraph` exists
+- deterministic reference colours and overrides
+- destination-coloured edge arrows
+- search, filters, diagnostics, source opening, fully offline normal operation
 
-## Explicitly not required for MVP
+## Explicitly not required
 
-- editing project files
-- automatically generating architecture edges from every import
-- full TypeScript language-server semantics
+- inferred import edges
+- source-language AST/type-system integration
+- multiple architecture nodes in one source file
+- nested `.archgraph` inheritance
+- regex discovery rules
+- language-specific parsers beyond generic Markdown/decorated dispatch
+- editable palette definitions
+- full layer-definition settings editor
 - live filesystem watching
 - Git integration
-- web-hosted version
-- collaboration features
-- telemetry
+- hosted web service
 
 ## Later possibilities
 
-- graph export
-- Mermaid export
-- Graphviz export
-- graph snapshots
-- filesystem watching
-- editor deep-links
-- CLI commands
-- standalone web viewer consuming pre-generated graph JSON
+- dedicated parsers for additional source/document formats
+- multiple declarations per source file
+- richer layer settings editor
+- palette extension/replacement configuration
+- graph export/import
+- filesystem watching/incremental rescan
+- persisted manual node positions

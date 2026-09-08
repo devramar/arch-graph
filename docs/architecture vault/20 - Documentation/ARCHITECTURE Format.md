@@ -1,93 +1,79 @@
-# ARCHITECTURE Format
+# Architecture Declaration Format
 
-## When to create one
+## Canonical markers
 
-Create an `ARCHITECTURE.md` only when a folder contains enough interacting structure that understanding it requires more than reading one obvious file.
-
-Good reasons include:
-
-- several files cooperate as one conceptual system
-- data or control flows through multiple stages
-- a public/internal boundary exists
-- important architectural invariants exist
-- relationships are not obvious from imports alone
-
-Do not create one merely because a folder exists.
-
-## Recommended structure
-
-```markdown
-# Canonical Name
-
-ARCH_NODE:Canonical Name
-
-## Description
-
-Short explanation of the system.
-
----
-
-## Purpose
-
-Why it exists.
-
----
-
-## Intended Usage
-
-Supported entry points, public APIs, normal usage, and small examples.
-
----
-
-## Architecture
-
-Important internal components and their relationships.
-
----
-
-## Dependencies
-
-ARCH_DEPENDENCY:Dependency Name
-
-Explanation of how and why this system depends on it.
-
-ARCH_DEPENDENCY:Another Dependency
-
-Explanation of that relationship.
-
----
-
-## Invariants
-
-Important assumptions that must remain true.
-
----
-
-## Relevant Files
-
-Short index of important implementation files.
+```text
+ARCH_NODE:<name>
+ARCH_REFERENCE:<name>
+ARCH_SUBREFERENCE:<name>
 ```
 
-## Scope
+`## References` is a recommended human-facing heading for Markdown, but headings do not define graph semantics. Configured marker tokens do.
 
-`ARCHITECTURE.md` explains system shape and relationships.
+## One source, one node
 
-It should not attempt to replace:
+A participating source file may declare at most one node in this version. Additional node markers produce `ARCH006`; the first valid declaration is retained.
 
-- inline TypeScript/TSDoc
-- generated API documentation
-- changelogs
-- TODO tracking
-- exhaustive implementation notes
+## Markdown sources
 
-## Relationship descriptions
+`.md` and `.markdown` files receive Markdown-specific parsing. Markers may appear directly in the document:
 
-Dependency descriptions should explain the architectural relationship rather than merely restating the target name.
+```markdown
+ARCH_NODE:EventSync
 
-Good:
+Event synchronization coordinates remote reconciliation.
 
-> Used as the canonical day representation when constructing synchronization windows.
+ARCH_REFERENCE:EventStore
 
-Weak:
+Uses persisted local event state during reconciliation.
+```
 
-> This feature uses DateKey.
+Dedicated Markdown declaration sources may contain arbitrary surrounding documentation. The complete Markdown source is preserved for the inspector.
+
+A matching Markdown file with no ArchGraph markers is ignored silently.
+
+## Decorated sources
+
+All other file types use a language-agnostic decoration-prefix parser.
+
+```ts
+/// ARCH_NODE:DateKey
+///
+/// Handles dates in string form "YYYY-MM-DD".
+///
+/// ARCH_REFERENCE:Clock
+/// Used when determining today.
+export type DateKey = `${number}-${number}-${number}`;
+```
+
+ArchGraph discovers the punctuation prefix (`///` here), strips that same prefix from adjacent description lines, and stops the description when the decoration block ends.
+
+Other examples include:
+
+```text
+# ARCH_NODE:ShellTask
+-- ARCH_NODE:SqlRepository
+* ARCH_NODE:BlockCommentNode
+```
+
+ArchGraph does not know which language those decorations belong to.
+
+Markers inside ordinary code/string text are not recognized because the prefix before the marker must be a punctuation-only decoration.
+
+## Candidate discovery
+
+File globs in `.archgraph` only select candidates. A candidate with no markers contributes nothing to the graph and produces no diagnostic.
+
+A source containing references/subreferences but no node marker produces `ARCH004`.
+
+A source matching more than one configured layer is skipped with `ARCH007`.
+
+## Normal references
+
+`ARCH_REFERENCE:Name` creates an edge owned by the declaring source. Within one composition group, it resolves to a unique matching architecture node if one exists; otherwise it uses a shared lightweight reference node.
+
+## Subreferences
+
+`ARCH_SUBREFERENCE:Name` always creates a local lightweight node attached only to its declaring source. It never merges or resolves by name, even when another declaration or subreference has the same name.
+
+Same-name subreferences may share deterministic visual styling in applications.

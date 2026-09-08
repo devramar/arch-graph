@@ -1,77 +1,61 @@
 # Graph Semantics
 
-## Architectural nodes
+## Declarations
 
-Any documented subsystem may declare:
+A configured node marker establishes a declaration:
 
 ```text
 ARCH_NODE:EventSync
 ```
 
-This creates a canonical architecture node.
+A source file may declare at most one node in this version.
 
-## Lightweight module nodes
-
-A dependency target does not need its own `ARCH_NODE:` declaration.
-
-For example:
+## References
 
 ```text
-ARCH_DEPENDENCY:DateKey
+ARCH_REFERENCE:EventStore
 ```
 
-may resolve directly to a TypeScript module or exported symbol named `DateKey`.
+creates a directed edge from the current declaration to explicit name `EventStore`.
 
-This allows concise utilities to participate in the graph without forcing unnecessary documentation.
+Inside one composition group:
 
-## Dependencies
+1. a unique architecture target with that name → connect to it;
+2. no architecture target → connect to one shared lightweight reference node;
+3. ambiguous architecture declarations → use the shared reference node and emit a diagnostic.
 
-A declaration:
+ArchGraph never uses imports, exports, modules, packages, ASTs, or language-server metadata to resolve names.
+
+## Subreferences
 
 ```text
-ARCH_DEPENDENCY:DateKey
+ARCH_SUBREFERENCE:Password Management
 ```
 
-creates a directed edge from the current architecture node to `DateKey`.
+creates a source-local satellite node. Same-name subreferences share visual identity but never graph identity.
 
-The prose immediately associated with that declaration describes the edge.
+## Layers
 
-## Name resolution
+Layers are independently discovered architecture representations of one project, such as:
 
-Bare names should be the normal form:
+- Architecture
+- Implementation
+- Overview
+- Infrastructure
+
+A file belongs to exactly one layer. Candidate globs only enroll a source when ArchGraph markers are actually present.
+
+## Composition groups
+
+Layers can be composed together. Same-name architecture declarations merge only inside the same group.
 
 ```text
-ARCH_DEPENDENCY:DateKey
+Architecture + Implementation   -> DateKey (merged, 2 declarations)
+Overview                        -> DateKey (separate node)
 ```
 
-When a name is ambiguous, a more explicit target may be used later, for example:
+Several groups can be visible simultaneously.
 
-```text
-ARCH_DEPENDENCY:@/core/date/DateKey
-```
+## Progressive documentation
 
-or:
-
-```text
-ARCH_DEPENDENCY:@/core/date/DateKey#DateKey
-```
-
-The exact qualified syntax can be finalized during implementation.
-
-## Ambiguity
-
-The resolver must not silently guess when multiple targets match.
-
-Ambiguous dependencies should remain visible in the graph and produce a diagnostic.
-
-## Direction
-
-Dependencies are directional.
-
-```text
-EventSync ─────▶ DateKey
-```
-
-means `EventSync` depends on `DateKey`.
-
-Reverse dependents can be calculated from incoming edges and do not need duplicate declarations.
+A shared reference can exist before any matching declaration exists. Adding a declaration later—or composing in another layer that declares the name—allows the reference to resolve without rewriting the original marker.

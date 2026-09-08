@@ -9,7 +9,18 @@
       ],
       "files": [
         "ARCHITECTURE.md"
-      ]
+      ],
+      "markers": {
+        "ARCH_NODE": [
+          "ARCH_NODE"
+        ],
+        "ARCH_REFERENCE": [
+          "ARCH_REFERENCE"
+        ],
+        "ARCH_SUBREFERENCE": [
+          "ARCH_SUBREFERENCE"
+        ]
+      }
     },
     "desktop": {
       "display_name": "Desktop Architecture",
@@ -17,7 +28,18 @@
       "ignored_paths": [],
       "files": [
         "ARCHITECTURE.md"
-      ]
+      ],
+      "markers": {
+        "ARCH_NODE": [
+          "ARCH_NODE"
+        ],
+        "ARCH_REFERENCE": [
+          "ARCH_REFERENCE"
+        ],
+        "ARCH_SUBREFERENCE": [
+          "ARCH_SUBREFERENCE"
+        ]
+      }
     }
   },
   "app_colours": {
@@ -26,18 +48,18 @@
       "subreferences": {}
     }
   },
-  "default_view": "sticky",
+  "default_view": "organic",
   "view_settings": {
     "desktop": {
       "layer_groups": [
         {
-          "id": "archgraph",
-          "name": "ArchGraph",
           "enabled": true,
+          "id": "archgraph",
           "layer_ids": [
             "architecture",
             "desktop"
-          ]
+          ],
+          "name": "Core Architecture + Desktop Architecture"
         }
       ]
     }

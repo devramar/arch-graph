@@ -2,67 +2,50 @@
 
 ARCH_NODE:ArchGraph Core
 
-## Description
+ArchGraph Core is the language-agnostic Rust engine that turns explicitly authored architecture declarations into independently scanned layers and presentation-neutral composed graphs.
 
-Standalone Rust engine that discovers explicit architecture declarations, organizes them into logical layers, composes selected layer groups, and emits a presentation-independent directed graph.
+## System boundary
 
----
-## Purpose
+The core owns project configuration, filesystem discovery, source parser selection, architecture declaration extraction, reference semantics, layer construction, graph composition, diagnostics, and `.archgraph` writes. Consumers receive serialized graph data and do not need to reproduce those semantics.
 
-Own project scanning, `.archgraph` configuration, source discovery, declaration parsing, reference semantics, layer composition, diagnostics, and graph construction independently of any UI or programming language.
+The core does not infer architecture from source imports, exports, symbols, package metadata, or language-specific syntax.
 
----
-## Intended Usage
+## Project configuration
 
-Use `scan_project(root)` for the default all-layer composition, `scan_project_state(root)` when a consumer needs independently scanned layers/configuration, and `compose_project_layers(...)` when an app needs custom layer groups without rescanning the filesystem.
+A single optional `.archgraph` file at the selected project root defines global ignored paths, logical layers, colour-name overrides, a default view, and opaque application view settings. Configuration is normalized and validated by the core before scanning or writing.
 
----
-## Architecture
+Each layer has a stable id, display name, literal project-relative `path_root`, layer-relative ignored-path globs, source file globs, and marker aliases. The built-in `architecture` layer is restored when omitted and defaults to project-wide `ARCHITECTURE.md` discovery.
 
-The scanner reads root `.archgraph`, applies built-in/Git/custom ignored paths, matches source candidates against per-layer file globs, and assigns each matched source to exactly one layer.
+Configuration writes use a normalized JSON representation and a temporary-file replacement path so applications do not write project settings directly.
 
-Markdown sources use the Markdown parser. Every other source type uses the language-agnostic decorated-text parser. Candidate files without markers are ignored.
+## Discovery and parsing
 
-Each layer is scanned independently. Composition then merges same-name architecture declarations only inside explicitly supplied layer groups. Different groups remain independent even when names match.
+Project traversal respects built-in excluded directories, Git ignore data, `.archgraphignore`, global configured ignores, layer roots, and layer-local ignores. Symlinks are not followed.
 
-Undocumented ordinary references become shared lightweight reference nodes. Subreferences always become source-local lightweight nodes and never merge or resolve by name.
+A source file is considered only inside a matching layer root and only when a configured file glob matches its path relative to that root. A source claimed by more than one layer is skipped with a diagnostic rather than assigned implicitly. Candidate files containing no ArchGraph markers are ignored.
 
----
+Parser dispatch is source-format based. Markdown files use the Markdown parser. Other files use decorated-text parsing, which recognizes marker lines behind a consistent punctuation decoration prefix and extracts adjacent text with the same decoration. Parser dispatch is centralized so additional source-format parsers can be introduced without changing layer or graph semantics.
+
+One source currently owns at most one architecture declaration.
+
 ## References
 
-ARCH_REFERENCE:ArchGraph Desktop
+Normal references are explicit, mergeable named relationships. During composition they target a unique same-name architecture declaration in the current group when one exists; otherwise they target a shared lightweight reference node. Missing targets are valid graph content rather than unresolved errors.
 
-Consumes independently scanned layers and asks the core to compose desktop layer groups rather than reimplementing merge semantics in TypeScript.
+Subreferences are source-local relationships. Their target nodes remain unique to the originating declaration, never resolve onto architecture nodes, and never merge by name.
 
----
-## Invariants
+Reference prose is edge documentation: it describes how the source declaration interacts with the referenced target.
 
-- Architectural edges only originate from explicit reference/subreference markers.
-- Candidate source globs never imply graph membership without ArchGraph markers.
-- Source-code imports, exports, modules, and language syntax are never parsed for graph meaning.
-- One source file may declare at most one architecture node.
-- A source matching multiple layers is skipped rather than assigned arbitrarily.
-- Same-name declarations merge only inside the same composition group.
-- Missing ordinary targets are valid shared reference nodes, not diagnostics.
-- Subreferences are always local to their declaration and never merge by name.
-- Project traversal does not follow symlinks by default.
-- `.archgraph` is root-scoped and parsed/validated/written by the core.
-- The serialized graph remains independent of Cytoscape.js and Tauri.
+## Layers and composition
 
----
-## Relevant Files
+Layers are scanned independently into graph fragments with declaration provenance. Composition groups are then built from selected layers without rescanning the filesystem.
 
-`src/config.rs`
-: `.archgraph` layers, ignored paths, markers, app settings, validation, and writes.
+Same-name architecture declarations merge only inside the same composition group. A merged node retains every contributing declaration, including its layer, project-relative source location, source format, and extracted documentation. Identical names in separate groups remain separate graph nodes.
 
-`src/model.rs`
-: Neutral graph-v3, declaration, layer, and composition contracts.
+Reference resolution is repeated at composition boundaries so a reference authored in one layer can resolve to a declaration supplied by another layer when both participate in the same group.
 
-`src/parser.rs`
-: Extensible source-parser dispatch with Markdown and decorated-text parsers.
+## Graph contract
 
-`src/resolver.rs`
-: Per-layer architecture/reference/subreference target resolution.
+The serialized graph separates architecture nodes from lightweight reference nodes and records reference versus subreference edges. Nodes and edges carry composition-group provenance; architecture declarations carry layer provenance.
 
-`src/scanner.rs`
-: Filesystem traversal, glob matching, layer scans, and core-owned group composition.
+Diagnostics remain part of the graph result so malformed or ambiguous architecture data can be inspected without making every documentation issue fatal to scanning.

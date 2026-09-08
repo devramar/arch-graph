@@ -126,13 +126,17 @@ pub fn scan_project_state_with_options(
         let matching_layers = configuration
             .layers
             .iter()
-            .filter(|(_, layer)| {
+            .filter_map(|(layer_id, layer)| {
+                let layer_relative_path = relative_to_layer_root(relative_path, &layer.path_root)?;
+                if PathPatterns::new(&layer.ignored_paths).matches_path(layer_relative_path) {
+                    return None;
+                }
                 layer
                     .files
                     .iter()
-                    .any(|pattern| glob_matches_file(pattern, relative_path))
+                    .any(|pattern| glob_matches_file(pattern, layer_relative_path))
+                    .then_some((layer_id.as_str(), layer))
             })
-            .map(|(layer_id, layer)| (layer_id.as_str(), layer))
             .collect::<Vec<_>>();
 
         if matching_layers.is_empty() {
@@ -647,6 +651,14 @@ fn should_skip(path: &Path) -> bool {
     })
 }
 
+fn relative_to_layer_root<'a>(path: &'a Path, path_root: &str) -> Option<&'a Path> {
+    if path_root == "." {
+        Some(path)
+    } else {
+        path.strip_prefix(Path::new(path_root)).ok()
+    }
+}
+
 #[derive(Clone)]
 struct PathPatterns {
     patterns: Vec<String>,
@@ -788,5 +800,14 @@ mod tests {
             "fixtures",
             Path::new("tests/fixtures/basic/ARCHITECTURE.md")
         ));
+    }
+
+    #[test]
+    fn layer_roots_change_the_path_coordinate_space() {
+        let source = Path::new("apps/desktop/src/App.tsx");
+        let relative = relative_to_layer_root(source, "apps/desktop").expect("inside layer root");
+        assert_eq!(relative, Path::new("src/App.tsx"));
+        assert!(glob_matches_file("src/**/*.tsx", relative));
+        assert!(relative_to_layer_root(source, "crates").is_none());
     }
 }

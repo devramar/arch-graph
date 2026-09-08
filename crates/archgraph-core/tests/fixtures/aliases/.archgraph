@@ -1,23 +1,46 @@
 {
-  "ignored_paths": ["ignored/**"],
+  "ignored_paths": [],
   "layers": {
     "architecture": {
       "display_name": "Architecture",
-      "files": ["DOCUMENTATION.md"],
+      "files": [
+        "DOCUMENTATION.md"
+      ],
       "markers": {
-        "ARCH_NODE": ["SYS_NODE"],
-        "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
-        "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
-      }
+        "ARCH_NODE": [
+          "SYS_NODE"
+        ],
+        "ARCH_REFERENCE": [
+          "SYS_REF",
+          "ARCH_REF"
+        ],
+        "ARCH_SUBREFERENCE": [
+          "SYS_LOCAL"
+        ]
+      },
+      "path_root": ".",
+      "ignored_paths": [
+        "ignored/**"
+      ]
     },
     "implementation": {
       "display_name": "Implementation",
-      "files": ["*.ts"],
+      "files": [
+        "*.ts"
+      ],
       "markers": {
-        "ARCH_NODE": ["ARCH_NODE"],
-        "ARCH_REFERENCE": ["ARCH_REFERENCE"],
-        "ARCH_SUBREFERENCE": ["ARCH_SUBREFERENCE"]
-      }
+        "ARCH_NODE": [
+          "ARCH_NODE"
+        ],
+        "ARCH_REFERENCE": [
+          "ARCH_REFERENCE"
+        ],
+        "ARCH_SUBREFERENCE": [
+          "ARCH_SUBREFERENCE"
+        ]
+      },
+      "path_root": "implementation",
+      "ignored_paths": []
     }
   },
   "app_colours": {

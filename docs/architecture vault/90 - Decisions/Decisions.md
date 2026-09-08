@@ -1,57 +1,47 @@
 # Decisions
 
-A concise record of decisions already made.
+## Documentation vocabulary
 
-## Documentation
-
-`ARCHITECTURE.md` is used only for sufficiently structured systems.
-
-Architecture documents use explicit searchable markers.
+Canonical markers are:
 
 ```text
 ARCH_NODE:Name
-ARCH_DEPENDENCY:Name
+ARCH_REFERENCE:Name
+ARCH_SUBREFERENCE:Name
 ```
 
-Dependency prose documents the edge.
+`## References` is recommended Markdown structure but does not gate marker recognition; Markdown boundaries only delimit adjacent prose.
+
+## Reference semantics
+
+Normal references merge by explicit name when undocumented and resolve to a unique matching architecture node when documented.
+
+Subreferences are source-local, never merge, and never resolve by name.
+
+Missing architecture documents are normal reference-node states rather than unresolved errors.
+
+## Language independence
+
+ArchGraph does not parse programming-language imports, exports, modules, symbols, ASTs, or type systems. Explicit architecture documents are the only semantic input.
+
+## Configuration
+
+One optional root `.archgraph` strict-JSON file controls accepted filename/marker aliases, reference/subreference colour overrides, default view, and opaque app view settings.
+
+Alias lists replace defaults. Nested configuration inheritance is deferred.
+
+The Rust core owns configuration parsing, validation, normalization, and writes.
 
 ## Graph model
 
-Small modules may appear as graph nodes without having their own architecture document.
+Graph format version 2 contains architecture/reference node kinds, shared/local reference scopes, and reference/subreference edge kinds.
 
-Reverse dependents are derived from incoming edges rather than declared separately.
+The graph remains presentation-independent.
 
-The graph format is presentation-independent.
+## Desktop visuals
 
-## Core
+Reference colours are deterministic from names unless overridden. Same-name subreferences therefore share visual identity while retaining separate node IDs.
 
-The scanner is a standalone Rust component.
+Edge arrows use the destination node primary colour.
 
-The desktop application consumes the core rather than embedding architecture semantics in the UI.
-
-## Desktop
-
-Primary implementation:
-
-- Tauri 2
-- React
-- TypeScript
-- Cytoscape.js
-
-The product is desktop-first and fully functional offline.
-
-## Interaction
-
-Graph panning should work with:
-
-- left-mouse drag on graph space
-- middle-mouse drag
-- Space + drag
-
-Edges have hover documentation and selectable detailed inspection.
-
-## Parsing philosophy
-
-Architecture relationships are intentionally authored.
-
-Source parsing exists to resolve those declarations, not to replace them with a noisy automatically inferred import graph.
+Subreferences use smaller dashed ellipse styling and shorter force-layout distances.

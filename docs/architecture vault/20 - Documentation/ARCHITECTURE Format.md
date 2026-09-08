@@ -1,18 +1,20 @@
-# ARCHITECTURE Format
+# Architecture Document Format
 
 ## When to create one
 
-Create an `ARCHITECTURE.md` only when a folder contains enough interacting structure that understanding it requires more than reading one obvious file.
+Create an architecture document only when a folder contains enough interacting structure that understanding it benefits from broad architectural explanation.
 
-Good reasons include:
+By default the filename is `ARCHITECTURE.md`; root `.archgraph` configuration can replace that accepted filename list.
 
-- several files cooperate as one conceptual system
-- data or control flows through multiple stages
-- a public/internal boundary exists
-- important architectural invariants exist
-- relationships are not obvious from imports alone
+## Canonical markers
 
-Do not create one merely because a folder exists.
+```text
+ARCH_NODE:Canonical Name
+ARCH_REFERENCE:Shared Reference Name
+ARCH_SUBREFERENCE:Local Reference Name
+```
+
+Configured aliases can replace these spellings.
 
 ## Recommended structure
 
@@ -27,67 +29,39 @@ Short explanation of the system.
 
 ---
 
-## Purpose
-
-Why it exists.
-
----
-
-## Intended Usage
-
-Supported entry points, public APIs, normal usage, and small examples.
-
----
-
 ## Architecture
 
-Important internal components and their relationships.
+Important internal components and relationships.
 
 ---
 
-## Dependencies
+## References
 
-ARCH_DEPENDENCY:Dependency Name
+ARCH_REFERENCE:Another System
 
-Explanation of how and why this system depends on it.
+Explanation of how and why this architecture references that system.
 
-ARCH_DEPENDENCY:Another Dependency
+ARCH_SUBREFERENCE:Password Management
 
-Explanation of that relationship.
+Explanation of a concept that should remain local to this architecture node.
 
 ---
 
 ## Invariants
 
 Important assumptions that must remain true.
-
----
-
-## Relevant Files
-
-Short index of important implementation files.
 ```
 
-## Scope
+`## References` is a human-facing convention and does not gate recognition. ArchGraph recognizes configured marker tokens wherever they appear; Markdown section boundaries are used only to delimit adjacent prose.
 
-`ARCHITECTURE.md` explains system shape and relationships.
+## Reference descriptions
 
-It should not attempt to replace:
+The prose beneath a reference marker belongs to the edge and should explain the interaction or reason for the reference rather than merely restating its name.
 
-- inline TypeScript/TSDoc
-- generated API documentation
-- changelogs
-- TODO tracking
-- exhaustive implementation notes
+## Shared references
 
-## Relationship descriptions
+A normal reference merges by explicit name when no architecture document exists. If a unique matching architecture node is later added, the edge resolves to it automatically.
 
-Dependency descriptions should explain the architectural relationship rather than merely restating the target name.
+## Subreferences
 
-Good:
-
-> Used as the canonical day representation when constructing synchronization windows.
-
-Weak:
-
-> This feature uses DateKey.
+A subreference is scoped to the declaring architecture node. It is not a child of the previous reference. It never merges or resolves by name, even when another node or architecture document has the same name.

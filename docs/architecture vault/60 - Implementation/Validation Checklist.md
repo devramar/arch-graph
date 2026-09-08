@@ -1,17 +1,20 @@
 # Validation Checklist
 
-See [[../../HANDOVER]] for the complete first-run validation process.
+See `docs/HANDOVER.md` for the current validation round.
 
 Minimum acceptance checks:
 
-- Rust workspace compiles and tests pass.
-- Frontend TypeScript build passes.
+- Rust workspace formats, compiles, clippy-checks, and tests.
+- Frontend TypeScript production build passes.
 - Tauri app starts.
-- Folder drag/drop scans a root.
-- `ARCH_NODE:` creates architecture nodes.
-- bare `ARCH_DEPENDENCY:` resolves architecture and TypeScript module targets.
-- dependency prose appears on edge hover and edge inspection.
-- ambiguity/unresolved states produce diagnostics rather than silent guesses.
-- left background drag, middle drag, and Space+drag pan.
-- direct node drag still moves nodes.
-- all core functionality works offline.
+- default `ARCH_NODE`, `ARCH_REFERENCE`, and `ARCH_SUBREFERENCE` markers scan correctly.
+- `.archgraph` filename/marker replacement aliases scan correctly.
+- a matching TypeScript source symbol does not affect reference resolution.
+- undocumented normal references render without unresolved diagnostics.
+- unique documented targets receive normal reference edges.
+- same-name subreferences remain separate nodes with matching colour identity.
+- destination arrow colours match destination node borders.
+- Sticky layout keeps subreferences substantially closer than normal references.
+- reference/subreference colour overrides are respected.
+- source opening remains root-confined.
+- configuration writes update only root `.archgraph` through the Rust core.

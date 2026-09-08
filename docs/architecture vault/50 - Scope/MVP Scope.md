@@ -3,46 +3,40 @@
 ## Required
 
 - standalone Rust scanning core
-- neutral graph model
+- neutral schema-v2 graph model
 - JSON serialization
+- optional root `.archgraph` configuration
+- configurable architecture document filenames
+- configurable node/reference/subreference marker aliases
+- Rust-owned `.archgraph` read/validate/write path
+- explicit shared references
+- explicit non-merging local subreferences
+- no programming-language source resolution
 - desktop Tauri application
-- drag/drop project root
-- folder picker
-- recursive project scan
-- locate `ARCHITECTURE.md`
-- parse `ARCH_NODE:`
-- parse `ARCH_DEPENDENCY:`
-- preserve dependency descriptions
-- resolve architecture-to-architecture dependencies
-- resolve useful TypeScript module/export targets
-- diagnostics for unresolved and ambiguous dependencies
-- Cytoscape.js graph rendering
-- edge hover descriptions
-- selectable nodes and edges
-- right-side inspector
-- search
-- node-kind filters
-- automatic graph layout
-- fully offline normal operation
+- drag/drop project root and folder picker
+- reference descriptions preserved on edges
+- duplicate/ambiguous architecture diagnostics
+- Cytoscape rendering
+- deterministic reference colours and project colour overrides
+- destination-coloured edge arrows
+- subreference visual/layout distinction
+- search, filters, inspector, and fully offline normal operation
 
-## Explicitly not required for MVP
+## Explicitly not required
 
-- editing project files
-- automatically generating architecture edges from every import
-- full TypeScript language-server semantics
+- inferred import edges
+- source-language AST/type-system integration
+- nested `.archgraph` inheritance
+- editable palette definitions in `.archgraph`
+- full settings UI
 - live filesystem watching
 - Git integration
-- web-hosted version
-- collaboration features
-- telemetry
+- hosted web service
 
 ## Later possibilities
 
-- graph export
-- Mermaid export
-- Graphviz export
-- graph snapshots
-- filesystem watching
-- editor deep-links
-- CLI commands
-- standalone web viewer consuming pre-generated graph JSON
+- settings editor using the existing configuration-write command
+- palette extension/replacement configuration
+- graph export/import
+- filesystem watching and incremental rescan
+- persisted manual node positions

@@ -1,179 +1,86 @@
 use crate::model::{
-    ArchitectureNode, Diagnostic, DiagnosticCode, DiagnosticSeverity, EdgeResolution, NodeKind,
-    SourceLocation,
+    ArchitectureNode, Diagnostic, DiagnosticCode, DiagnosticSeverity, NodeKind, ReferenceKind,
+    ReferenceScope, SourceLocation,
 };
-use regex::Regex;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-
-#[derive(Debug, Clone)]
-pub(crate) struct ModuleSymbol {
-    pub name: String,
-    pub file: PathBuf,
-    pub line: usize,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct SymbolIndex {
-    by_name: HashMap<String, Vec<ModuleSymbol>>,
-}
+use std::path::Path;
 
 #[derive(Debug)]
 pub(crate) struct Resolution {
     pub node: ArchitectureNode,
-    pub resolution: EdgeResolution,
     pub diagnostic: Option<Diagnostic>,
 }
 
-impl SymbolIndex {
-    pub fn add_source(&mut self, relative_path: &Path, contents: &str) {
-        for symbol in extract_exported_symbols(relative_path, contents) {
-            let candidates = self.by_name.entry(symbol.name.clone()).or_default();
-
-            // TypeScript declaration merging (for example `type DateKey` plus
-            // `namespace DateKey`) should still represent one graph target when
-            // the declarations live in the same module.
-            if candidates.iter().all(|candidate| candidate.file != symbol.file) {
-                candidates.push(symbol);
-            }
-        }
-    }
-
-    pub fn resolve(
-        &self,
-        target: &str,
-        architectures: &HashMap<String, Vec<ArchitectureNode>>,
-        source: &SourceLocation,
-    ) -> Resolution {
-        if let Some(candidates) = architectures.get(target) {
-            if candidates.len() == 1 {
-                return Resolution {
-                    node: candidates[0].clone(),
-                    resolution: EdgeResolution::Architecture,
-                    diagnostic: None,
-                };
-            }
-
-            if candidates.len() > 1 {
-                return ambiguous_resolution(target, candidates, source);
-            }
-        }
-
-        if let Some(symbols) = self.by_name.get(target) {
-            if symbols.len() == 1 {
-                let symbol = &symbols[0];
-                return Resolution {
-                    node: ArchitectureNode {
-                        id: module_node_id(&symbol.file, &symbol.name),
-                        name: symbol.name.clone(),
-                        kind: NodeKind::Module,
-                        source: Some(SourceLocation {
-                            file: symbol.file.clone(),
-                            line: Some(symbol.line),
-                        }),
-                        summary: None,
-                        documentation: None,
-                    },
-                    resolution: EdgeResolution::Module,
-                    diagnostic: None,
-                };
-            }
-
-            let candidates = symbols
-                .iter()
-                .map(|symbol| format!("{}#{}", symbol.file.display(), symbol.name))
-                .collect::<Vec<_>>();
-
-            return unresolved_node(
-                target,
-                EdgeResolution::Ambiguous,
-                Some(Diagnostic {
-                    code: DiagnosticCode::AmbiguousDependency,
-                    severity: DiagnosticSeverity::Warning,
-                    message: format!("Ambiguous dependency: {target}"),
-                    source: Some(source.clone()),
-                    candidates,
-                }),
-            );
-        }
-
-        unresolved_node(
-            target,
-            EdgeResolution::Unresolved,
-            Some(Diagnostic {
-                code: DiagnosticCode::UnresolvedDependency,
-                severity: DiagnosticSeverity::Warning,
-                message: format!("Could not resolve dependency: {target}"),
-                source: Some(source.clone()),
-                candidates: Vec::new(),
-            }),
-        )
-    }
-}
-
-fn extract_exported_symbols(relative_path: &Path, contents: &str) -> Vec<ModuleSymbol> {
-    static EXPORT_RE: OnceLock<Regex> = OnceLock::new();
-    let regex = EXPORT_RE.get_or_init(|| {
-        Regex::new(
-            r"(?x)^\s*export\s+(?:declare\s+)?(?:default\s+)?(?:abstract\s+)?(?:async\s+)?(?:class|interface|type|enum|namespace|function|const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)",
-        )
-        .expect("valid export regex")
-    });
-
-    contents
-        .lines()
-        .enumerate()
-        .filter_map(|(index, line)| {
-            regex.captures(line).and_then(|captures| {
-                captures.get(1).map(|name| ModuleSymbol {
-                    name: name.as_str().to_owned(),
-                    file: relative_path.to_path_buf(),
-                    line: index + 1,
-                })
-            })
-        })
-        .collect()
-}
-
-fn ambiguous_resolution(
+pub(crate) fn resolve_reference(
     target: &str,
-    candidates: &[ArchitectureNode],
+    kind: ReferenceKind,
+    architectures: &HashMap<String, Vec<ArchitectureNode>>,
+    source_node_id: &str,
+    ordinal: usize,
     source: &SourceLocation,
 ) -> Resolution {
-    unresolved_node(
-        target,
-        EdgeResolution::Ambiguous,
-        Some(Diagnostic {
-            code: DiagnosticCode::AmbiguousDependency,
-            severity: DiagnosticSeverity::Warning,
-            message: format!("Ambiguous architecture dependency: {target}"),
-            source: Some(source.clone()),
-            candidates: candidates
-                .iter()
-                .filter_map(|candidate| candidate.source.as_ref())
-                .map(|location| location.file.display().to_string())
-                .collect(),
-        }),
-    )
+    if kind == ReferenceKind::Subreference {
+        return Resolution {
+            node: reference_node(
+                format!("subref:{source_node_id}:{ordinal}#{target}"),
+                target,
+                ReferenceScope::Local,
+            ),
+            diagnostic: None,
+        };
+    }
+
+    if let Some(candidates) = architectures.get(target) {
+        if candidates.len() == 1 {
+            return Resolution {
+                node: candidates[0].clone(),
+                diagnostic: None,
+            };
+        }
+
+        if candidates.len() > 1 {
+            return Resolution {
+                node: reference_node(
+                    format!("reference:{target}"),
+                    target,
+                    ReferenceScope::Shared,
+                ),
+                diagnostic: Some(Diagnostic {
+                    code: DiagnosticCode::AmbiguousReference,
+                    severity: DiagnosticSeverity::Warning,
+                    message: format!(
+                        "Reference {target:?} matches multiple architecture documents"
+                    ),
+                    source: Some(source.clone()),
+                    candidates: candidates
+                        .iter()
+                        .filter_map(|candidate| candidate.source.as_ref())
+                        .map(|location| location.file.display().to_string())
+                        .collect(),
+                }),
+            };
+        }
+    }
+
+    Resolution {
+        node: reference_node(
+            format!("reference:{target}"),
+            target,
+            ReferenceScope::Shared,
+        ),
+        diagnostic: None,
+    }
 }
 
-fn unresolved_node(
-    target: &str,
-    resolution: EdgeResolution,
-    diagnostic: Option<Diagnostic>,
-) -> Resolution {
-    Resolution {
-        node: ArchitectureNode {
-            id: format!("unresolved:{target}"),
-            name: target.to_owned(),
-            kind: NodeKind::Unresolved,
-            source: None,
-            summary: None,
-            documentation: None,
-        },
-        resolution,
-        diagnostic,
+fn reference_node(id: String, name: &str, scope: ReferenceScope) -> ArchitectureNode {
+    ArchitectureNode {
+        id,
+        name: name.to_owned(),
+        kind: NodeKind::Reference,
+        reference_scope: Some(scope),
+        source: None,
+        summary: None,
+        documentation: None,
     }
 }
 
@@ -181,29 +88,147 @@ pub(crate) fn architecture_node_id(relative_architecture_file: &Path, name: &str
     format!("arch:{}#{name}", relative_architecture_file.display())
 }
 
-fn module_node_id(relative_file: &Path, name: &str) -> String {
-    format!("module:{}#{name}", relative_file.display())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn indexes_common_typescript_exports() {
-        let source = r#"
-export type DateKey = string;
-export namespace DateKey {}
-export interface EventStore {}
-export class Thing {}
-const hidden = 1;
-"#;
-        let mut index = SymbolIndex::default();
-        index.add_source(Path::new("src/types.ts"), source);
+    fn undocumented_references_merge_by_explicit_name() {
+        let architectures = HashMap::new();
+        let source = SourceLocation {
+            file: "ARCHITECTURE.md".into(),
+            line: Some(4),
+        };
 
-        assert_eq!(index.by_name["EventStore"].len(), 1);
-        assert_eq!(index.by_name["Thing"].len(), 1);
-        assert!(!index.by_name.contains_key("hidden"));
-        assert_eq!(index.by_name["DateKey"].len(), 1);
+        let first = resolve_reference(
+            "Authentication",
+            ReferenceKind::Reference,
+            &architectures,
+            "arch:a#A",
+            0,
+            &source,
+        );
+        let second = resolve_reference(
+            "Authentication",
+            ReferenceKind::Reference,
+            &architectures,
+            "arch:b#B",
+            0,
+            &source,
+        );
+
+        assert_eq!(first.node.id, second.node.id);
+        assert_eq!(first.node.reference_scope, Some(ReferenceScope::Shared));
+        assert!(first.diagnostic.is_none());
+        assert!(second.diagnostic.is_none());
+    }
+
+    #[test]
+    fn ordinary_reference_resolves_only_to_a_unique_architecture_node() {
+        let source = SourceLocation {
+            file: "ARCHITECTURE.md".into(),
+            line: Some(4),
+        };
+        let architecture = ArchitectureNode {
+            id: "arch:identity/ARCHITECTURE.md#Identity".to_owned(),
+            name: "Identity".to_owned(),
+            kind: NodeKind::Architecture,
+            reference_scope: None,
+            source: Some(SourceLocation {
+                file: "identity/ARCHITECTURE.md".into(),
+                line: Some(3),
+            }),
+            summary: None,
+            documentation: None,
+        };
+        let architectures = HashMap::from([("Identity".to_owned(), vec![architecture.clone()])]);
+
+        let resolved = resolve_reference(
+            "Identity",
+            ReferenceKind::Reference,
+            &architectures,
+            "arch:checkout#Checkout",
+            0,
+            &source,
+        );
+
+        assert_eq!(resolved.node, architecture);
+        assert!(resolved.diagnostic.is_none());
+    }
+
+    #[test]
+    fn ambiguous_architecture_names_are_not_guessed() {
+        let source = SourceLocation {
+            file: "ARCHITECTURE.md".into(),
+            line: Some(4),
+        };
+        let architecture = |id: &str, file: &str| ArchitectureNode {
+            id: id.to_owned(),
+            name: "Identity".to_owned(),
+            kind: NodeKind::Architecture,
+            reference_scope: None,
+            source: Some(SourceLocation {
+                file: file.into(),
+                line: Some(3),
+            }),
+            summary: None,
+            documentation: None,
+        };
+        let architectures = HashMap::from([(
+            "Identity".to_owned(),
+            vec![
+                architecture("arch:a#Identity", "a/ARCHITECTURE.md"),
+                architecture("arch:b#Identity", "b/ARCHITECTURE.md"),
+            ],
+        )]);
+
+        let resolved = resolve_reference(
+            "Identity",
+            ReferenceKind::Reference,
+            &architectures,
+            "arch:checkout#Checkout",
+            0,
+            &source,
+        );
+
+        assert_eq!(resolved.node.kind, NodeKind::Reference);
+        assert_eq!(resolved.node.reference_scope, Some(ReferenceScope::Shared));
+        assert_eq!(
+            resolved
+                .diagnostic
+                .as_ref()
+                .map(|diagnostic| diagnostic.code),
+            Some(DiagnosticCode::AmbiguousReference)
+        );
+    }
+
+    #[test]
+    fn subreferences_never_merge() {
+        let architectures = HashMap::new();
+        let source = SourceLocation {
+            file: "ARCHITECTURE.md".into(),
+            line: Some(4),
+        };
+
+        let first = resolve_reference(
+            "Password Management",
+            ReferenceKind::Subreference,
+            &architectures,
+            "arch:a#A",
+            0,
+            &source,
+        );
+        let second = resolve_reference(
+            "Password Management",
+            ReferenceKind::Subreference,
+            &architectures,
+            "arch:b#B",
+            0,
+            &source,
+        );
+
+        assert_ne!(first.node.id, second.node.id);
+        assert_eq!(first.node.name, second.node.name);
+        assert_eq!(first.node.reference_scope, Some(ReferenceScope::Local));
     }
 }

@@ -1,10 +1,15 @@
+use crate::config::{
+    ConfigurationError, ProjectConfiguration, load_project_configuration_from_root,
+};
 use crate::model::{
     ArchitectureEdge, ArchitectureGraph, ArchitectureNode, Diagnostic, DiagnosticCode,
-    DiagnosticSeverity, NodeKind, ProjectInfo, SourceLocation, GRAPH_FORMAT_VERSION,
+    DiagnosticSeverity, GRAPH_FORMAT_VERSION, NodeKind, ProjectInfo, ReferenceScope,
+    SourceLocation,
 };
 use crate::parser::{ParsedArchitectureDocument, parse_architecture_document};
-use crate::resolver::{SymbolIndex, architecture_node_id};
+use crate::resolver::{architecture_node_id, resolve_reference};
 use ignore::WalkBuilder;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
@@ -21,31 +26,41 @@ pub enum ScanError {
     Canonicalize { path: PathBuf, source: io::Error },
     #[error("failed to read {path}: {source}")]
     ReadFile { path: PathBuf, source: io::Error },
+    #[error(transparent)]
+    Configuration(#[from] ConfigurationError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ScanOptions {
-    pub architecture_filename: String,
     pub include_hidden: bool,
 }
 
-impl Default for ScanOptions {
-    fn default() -> Self {
-        Self {
-            architecture_filename: "ARCHITECTURE.md".to_owned(),
-            include_hidden: false,
-        }
-    }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectScan {
+    pub graph: ArchitectureGraph,
+    pub configuration: ProjectConfiguration,
 }
 
 pub fn scan_project(root: impl AsRef<Path>) -> Result<ArchitectureGraph, ScanError> {
-    scan_project_with_options(root, &ScanOptions::default())
+    Ok(scan_project_state(root)?.graph)
+}
+
+pub fn scan_project_state(root: impl AsRef<Path>) -> Result<ProjectScan, ScanError> {
+    scan_project_state_with_options(root, &ScanOptions::default())
 }
 
 pub fn scan_project_with_options(
     root: impl AsRef<Path>,
     options: &ScanOptions,
 ) -> Result<ArchitectureGraph, ScanError> {
+    Ok(scan_project_state_with_options(root, options)?.graph)
+}
+
+pub fn scan_project_state_with_options(
+    root: impl AsRef<Path>,
+    options: &ScanOptions,
+) -> Result<ProjectScan, ScanError> {
     let supplied_root = root.as_ref();
     if !supplied_root.exists() {
         return Err(ScanError::RootMissing(supplied_root.to_path_buf()));
@@ -60,9 +75,15 @@ pub fn scan_project_with_options(
             path: supplied_root.to_path_buf(),
             source,
         })?;
+    let configuration = load_project_configuration_from_root(&root)?;
+    let architecture_filenames = configuration
+        .aliasing
+        .architecture_files
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
 
     let mut documents = Vec::new();
-    let mut symbols = SymbolIndex::default();
 
     let filter_root = root.clone();
     let mut builder = WalkBuilder::new(&root);
@@ -74,7 +95,10 @@ pub fn scan_project_with_options(
         .git_exclude(true)
         .add_custom_ignore_filename(".archgraphignore")
         .filter_entry(move |entry| {
-            let relative = entry.path().strip_prefix(&filter_root).unwrap_or(entry.path());
+            let relative = entry
+                .path()
+                .strip_prefix(&filter_root)
+                .unwrap_or(entry.path());
             !should_skip(relative)
         });
 
@@ -95,35 +119,38 @@ pub fn scan_project_with_options(
         if relative_path
             .file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name == options.architecture_filename)
+            .is_some_and(|name| architecture_filenames.contains(name))
         {
             let contents = read_utf8(path)?;
-            documents.push(parse_architecture_document(relative_path, &contents));
-        } else if is_typescript_source(relative_path) {
-            let contents = read_utf8(path)?;
-            symbols.add_source(relative_path, &contents);
+            documents.push(parse_architecture_document(
+                relative_path,
+                &contents,
+                &configuration.aliasing,
+            ));
         }
     }
 
-    Ok(build_graph(&root, documents, symbols))
+    Ok(ProjectScan {
+        graph: build_graph(&root, documents),
+        configuration,
+    })
 }
 
-fn build_graph(
-    root: &Path,
-    documents: Vec<ParsedArchitectureDocument>,
-    symbols: SymbolIndex,
-) -> ArchitectureGraph {
+fn build_graph(root: &Path, documents: Vec<ParsedArchitectureDocument>) -> ArchitectureGraph {
     let mut diagnostics = Vec::new();
     let mut architecture_by_name: HashMap<String, Vec<ArchitectureNode>> = HashMap::new();
 
     for document in &documents {
         diagnostics.extend(document.diagnostics.clone());
-        let Some(parsed_node) = &document.node else { continue };
+        let Some(parsed_node) = &document.node else {
+            continue;
+        };
 
         let node = ArchitectureNode {
             id: architecture_node_id(&document.source_file, &parsed_node.name),
             name: parsed_node.name.clone(),
             kind: NodeKind::Architecture,
+            reference_scope: None,
             source: Some(SourceLocation {
                 file: document.source_file.clone(),
                 line: Some(parsed_node.line),
@@ -143,7 +170,7 @@ fn build_graph(
             diagnostics.push(Diagnostic {
                 code: DiagnosticCode::DuplicateArchitectureNode,
                 severity: DiagnosticSeverity::Warning,
-                message: format!("Duplicate ARCH_NODE name: {name}"),
+                message: format!("Duplicate architecture node name: {name}"),
                 source: nodes.first().and_then(|node| node.source.clone()),
                 candidates: nodes
                     .iter()
@@ -159,28 +186,44 @@ fn build_graph(
         .flatten()
         .cloned()
         .collect::<Vec<_>>();
-    let mut known_node_ids = nodes.iter().map(|node| node.id.clone()).collect::<HashSet<_>>();
+    let mut known_node_ids = nodes
+        .iter()
+        .map(|node| node.id.clone())
+        .collect::<HashSet<_>>();
     let mut edges = Vec::new();
 
     for document in &documents {
-        let Some(parsed_node) = &document.node else { continue };
-        let Some(source_node) = architecture_by_name
-            .get(&parsed_node.name)
-            .and_then(|candidates| {
-                candidates
-                    .iter()
-                    .find(|candidate| candidate.source.as_ref().is_some_and(|source| source.file == document.source_file))
-            })
+        let Some(parsed_node) = &document.node else {
+            continue;
+        };
+        let Some(source_node) =
+            architecture_by_name
+                .get(&parsed_node.name)
+                .and_then(|candidates| {
+                    candidates.iter().find(|candidate| {
+                        candidate
+                            .source
+                            .as_ref()
+                            .is_some_and(|source| source.file == document.source_file)
+                    })
+                })
         else {
             continue;
         };
 
-        for (ordinal, dependency) in document.dependencies.iter().enumerate() {
+        for (ordinal, reference) in document.references.iter().enumerate() {
             let source_location = SourceLocation {
                 file: document.source_file.clone(),
-                line: Some(dependency.line),
+                line: Some(reference.line),
             };
-            let resolved = symbols.resolve(&dependency.target, &architecture_by_name, &source_location);
+            let resolved = resolve_reference(
+                &reference.target,
+                reference.kind,
+                &architecture_by_name,
+                &source_node.id,
+                ordinal,
+                &source_location,
+            );
 
             if known_node_ids.insert(resolved.node.id.clone()) {
                 nodes.push(resolved.node.clone());
@@ -193,16 +236,29 @@ fn build_graph(
                 id: format!("edge:{}:{}:{ordinal}", source_node.id, resolved.node.id),
                 source: source_node.id.clone(),
                 target: resolved.node.id,
-                target_name: dependency.target.clone(),
-                description: dependency.description.clone(),
+                target_name: reference.target.clone(),
+                description: reference.description.clone(),
                 source_location,
-                resolution: resolved.resolution,
+                reference_kind: reference.kind,
             });
         }
     }
 
-    nodes.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
-    edges.sort_by(|a, b| a.source.cmp(&b.source).then(a.target.cmp(&b.target)));
+    nodes.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then(
+                reference_scope_order(a.reference_scope)
+                    .cmp(&reference_scope_order(b.reference_scope)),
+            )
+            .then(a.id.cmp(&b.id))
+    });
+    edges.sort_by(|a, b| {
+        a.source
+            .cmp(&b.source)
+            .then(a.target.cmp(&b.target))
+            .then(a.id.cmp(&b.id))
+    });
     diagnostics.sort_by(|a, b| a.message.cmp(&b.message));
 
     ArchitectureGraph {
@@ -221,6 +277,14 @@ fn build_graph(
     }
 }
 
+fn reference_scope_order(scope: Option<ReferenceScope>) -> u8 {
+    match scope {
+        None => 0,
+        Some(ReferenceScope::Shared) => 1,
+        Some(ReferenceScope::Local) => 2,
+    }
+}
+
 fn read_utf8(path: &Path) -> Result<String, ScanError> {
     fs::read_to_string(path).map_err(|source| ScanError::ReadFile {
         path: path.to_path_buf(),
@@ -228,20 +292,16 @@ fn read_utf8(path: &Path) -> Result<String, ScanError> {
     })
 }
 
-fn is_typescript_source(path: &Path) -> bool {
-    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
-    if name.ends_with(".d.ts") {
-        return false;
-    }
-
-    matches!(
-        path.extension().and_then(|extension| extension.to_str()),
-        Some("ts" | "tsx" | "mts" | "cts")
-    )
-}
-
 fn should_skip(path: &Path) -> bool {
-    const EXCLUDED: &[&str] = &[".git", "node_modules", "dist", "build", "target", ".expo", ".next"];
+    const EXCLUDED: &[&str] = &[
+        ".git",
+        "node_modules",
+        "dist",
+        "build",
+        "target",
+        ".expo",
+        ".next",
+    ];
     path.components().any(|component| {
         component
             .as_os_str()

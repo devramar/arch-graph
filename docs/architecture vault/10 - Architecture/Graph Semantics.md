@@ -1,77 +1,46 @@
 # Graph Semantics
 
-## Architectural nodes
+## Architecture nodes
 
-Any documented subsystem may declare:
+A configured node marker establishes a canonical documented node:
 
 ```text
 ARCH_NODE:EventSync
 ```
 
-This creates a canonical architecture node.
-
-## Lightweight module nodes
-
-A dependency target does not need its own `ARCH_NODE:` declaration.
-
-For example:
+## References
 
 ```text
-ARCH_DEPENDENCY:DateKey
+ARCH_REFERENCE:EventStore
 ```
 
-may resolve directly to a TypeScript module or exported symbol named `DateKey`.
+creates a directed edge from the current architecture node to the explicit name `EventStore`.
 
-This allows concise utilities to participate in the graph without forcing unnecessary documentation.
+If exactly one `ARCH_NODE:EventStore` exists, the edge targets that architecture node. Otherwise, when no document exists, ArchGraph creates one globally shared lightweight `EventStore` reference node.
 
-## Dependencies
+ArchGraph does not search imports, exports, modules, packages, ASTs, or language-server metadata to resolve the name.
 
-A declaration:
+## Subreferences
 
 ```text
-ARCH_DEPENDENCY:DateKey
+ARCH_SUBREFERENCE:Password Management
 ```
 
-creates a directed edge from the current architecture node to `DateKey`.
+creates a local satellite reference node attached only to the declaring architecture node.
 
-The prose immediately associated with that declaration describes the edge.
-
-## Name resolution
-
-Bare names should be the normal form:
+Same-name subreferences remain distinct graph identities:
 
 ```text
-ARCH_DEPENDENCY:DateKey
+Service A → Password Management #1
+Service B → Password Management #2
 ```
 
-When a name is ambiguous, a more explicit target may be used later, for example:
-
-```text
-ARCH_DEPENDENCY:@/core/date/DateKey
-```
-
-or:
-
-```text
-ARCH_DEPENDENCY:@/core/date/DateKey#DateKey
-```
-
-The exact qualified syntax can be finalized during implementation.
-
-## Ambiguity
-
-The resolver must not silently guess when multiple targets match.
-
-Ambiguous dependencies should remain visible in the graph and produce a diagnostic.
+They may share visual styling, but they never merge and never resolve to `ARCH_NODE:Password Management`.
 
 ## Direction
 
-Dependencies are directional.
+References are directional. Reverse relationships are derived from incoming edges rather than authored separately.
 
-```text
-EventSync ─────▶ DateKey
-```
+## Progressive documentation
 
-means `EventSync` depends on `DateKey`.
-
-Reverse dependents can be calculated from incoming edges and do not need duplicate declarations.
+A shared reference can exist before it has architecture documentation. Adding a unique matching `ARCH_NODE` later automatically converts future scans to target that architecture node without rewriting the existing reference declarations.

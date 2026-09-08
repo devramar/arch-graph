@@ -1,27 +1,32 @@
-import type { ArchitectureGraph, NodeKind } from '../types';
+import type { ArchitectureGraph, ArchitectureNode } from '../types';
 
-export type NodeKindFilter = Record<NodeKind, boolean>;
+export type NodeFilterKind = 'architecture' | 'reference' | 'subreference';
+export type NodeKindFilter = Record<NodeFilterKind, boolean>;
 
 interface SidebarProps {
     graph: ArchitectureGraph;
     filters: NodeKindFilter;
-    onFilterChange: (kind: NodeKind, enabled: boolean) => void;
+    onFilterChange: (kind: NodeFilterKind, enabled: boolean) => void;
 }
 
-const labels: Record<NodeKind, string> = {
+const labels: Record<NodeFilterKind, string> = {
     architecture: 'Architecture',
-    module: 'Modules',
-    external: 'External',
-    unresolved: 'Unresolved',
+    reference: 'References',
+    subreference: 'Subreferences',
 };
 
+export function filterKindForNode(node: ArchitectureNode): NodeFilterKind {
+    if (node.kind === 'architecture') return 'architecture';
+    return node.referenceScope === 'local' ? 'subreference' : 'reference';
+}
+
 export function Sidebar({ graph, filters, onFilterChange }: SidebarProps) {
-    const counts = graph.nodes.reduce<Record<NodeKind, number>>(
+    const counts = graph.nodes.reduce<Record<NodeFilterKind, number>>(
         (result, node) => {
-            result[node.kind] += 1;
+            result[filterKindForNode(node)] += 1;
             return result;
         },
-        { architecture: 0, module: 0, external: 0, unresolved: 0 },
+        { architecture: 0, reference: 0, subreference: 0 },
     );
 
     return (
@@ -35,7 +40,7 @@ export function Sidebar({ graph, filters, onFilterChange }: SidebarProps) {
             <section>
                 <h3>Nodes</h3>
                 <div className="filter-list">
-                    {(Object.keys(labels) as NodeKind[]).map((kind) => (
+                    {(Object.keys(labels) as NodeFilterKind[]).map((kind) => (
                         <label className="filter-row" key={kind}>
                             <input
                                 type="checkbox"

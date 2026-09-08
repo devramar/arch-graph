@@ -1,68 +1,49 @@
 # Interaction Model
 
-## Input philosophy
+## Panning and zoom
 
-The application is optimized for mouse and keyboard use on a desktop.
-
-## Panning
-
-All of the following pan the graph:
-
-- left mouse drag on empty graph space
-- middle mouse drag
-- Space + drag
+- left mouse drag on empty graph space — pan
+- middle mouse drag — pan
+- Space + drag — pan
+- mouse wheel — zoom
+- Shift + wheel — stronger zoom
 
 Directly dragging a node moves the node unless Space is held.
 
-## Zoom
-
-Mouse wheel controls graph zoom at a deliberately strong desktop sensitivity.
-
-Shift + wheel applies a larger zoom step while preserving the cursor as the zoom focal point.
-
 ## Selection
 
-Single click selects a node or relationship.
-
-Selection styling must not alter node geometry.
+Single click selects a node or reference edge. Selection styling does not alter node geometry.
 
 ## Declarations
 
-Nodes with source declarations and relationships with declaration locations can be opened with the operating system's default application.
+Architecture nodes with source declarations and reference edges with declaration locations can be opened with the operating system's default application. The desktop adapter validates that the file remains inside the selected project root.
 
-Access is available from:
+## Reference hover
 
-- right-click context menu on a graph element
-- **Open in editor** beside Source/Declaration in the inspector
-
-The desktop adapter validates that the requested file remains inside the currently selected project root before opening it.
-
-## Relationship hover
-
-Hovering a relationship shows a cursor-following preview containing:
+Hovering an edge shows:
 
 - source node
 - target node
-- dependency description
+- reference description
 
-An optional **Descriptions** panel at the bottom of the graph presents the same documentation in a larger stable surface. It follows the hovered relationship and falls back to the selected relationship when nothing is hovered.
+The optional Descriptions panel shows the same edge-owned prose in a stable surface.
+
+## Reference nodes
+
+Selecting an undocumented shared reference explains that no architecture document describes the explicit name and lists architectures that reference it.
+
+Selecting a local subreference explains that it is declaration-scoped and never merges by name.
 
 ## Search
 
-Search should support finding nodes by canonical name and rapidly isolating their local dependency neighborhood.
+Search finds nodes by canonical/explicit name and isolates their local graph neighborhood.
 
-## Keyboard interactions
+## Layouts
 
-- `/` focuses search
-- `Esc` clears current selection/context menu
-- `F` fits the visible graph
-- `Space + drag` pans
-- `Shift + wheel` zooms faster
-
-## Layout
-
-Three layout modes are available:
-
-- **Dependency** — hierarchical directed layout
+- **Directed** — left-to-right hierarchical layout
 - **Organic** — force-directed fCoSE layout
-- **Sticky** — fCoSE layout that performs an incremental settling pass after a node is manually repositioned, approximating the sticky/simulation behavior of tools such as Obsidian graph view
+- **Sticky** — force-directed layout with incremental settling after manual repositioning
+
+Normal reference spacing is deliberately larger than the previous implementation. Subreference edges use shorter ideal lengths and stronger attraction so local satellites remain visually close to their owner.
+
+Desktop-specific layout tuning may be supplied through `.archgraph` `view_settings`.

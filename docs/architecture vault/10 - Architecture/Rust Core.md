@@ -2,62 +2,29 @@
 
 ## Responsibility
 
-The Rust core owns project scanning and graph construction.
+The Rust core owns project scanning, `.archgraph` configuration, architecture-document parsing, graph construction, diagnostics, and project-configuration writes.
 
-It must not depend on the desktop application.
-
-## Inputs
-
-Primary input:
-
-- a project root directory
-
-The core scans within that root for relevant architecture documents and source files.
-
-## Outputs
-
-Primary output:
-
-- a neutral architecture graph data structure
-
-The same data should be serializable as JSON so any external program can consume it.
-
-See [[Core Graph Model]].
+It does not depend on the desktop application or any programming language.
 
 ## Core operations
 
-1. Walk the project tree.
-2. Find `ARCHITECTURE.md` files.
-3. Parse `ARCH_NODE:` declarations.
-4. Parse `ARCH_DEPENDENCY:` declarations and their descriptions.
-5. Index resolvable TypeScript modules and exported symbols.
-6. Resolve dependency names.
-7. Produce graph nodes, edges, and diagnostics.
+1. Validate and canonicalize the selected project root.
+2. Read root `.archgraph` if present.
+3. Normalize and validate aliases/configuration.
+4. Walk the project tree without following symlinks.
+5. Find configured architecture-document filenames.
+6. Parse configured node/reference/subreference markers.
+7. Resolve normal references only against documented architecture-node names.
+8. Create shared or local lightweight reference nodes where appropriate.
+9. Produce graph nodes, edges, and diagnostics.
+10. Return normalized configuration to consumers that request project state.
 
-## Filesystem boundaries
+## Source-language independence
 
-The scanner receives one explicit root.
+The core intentionally does not parse TypeScript, Rust, Python, imports, exports, symbols, packages, or ASTs. Source files are irrelevant unless they are architecture documents under a configured filename.
 
-It must not intentionally read outside that root.
+## Configuration writes
 
-Symlinks should not be followed by default.
+Consumers can submit a typed `ProjectConfiguration` to the core. The core validates and canonicalizes it, serializes strict JSON, writes a completed temporary file, and replaces the root `.archgraph` file.
 
-## TypeScript resolution
-
-For the first version, TypeScript parsing exists to resolve explicitly documented dependencies such as:
-
-```text
-ARCH_DEPENDENCY:DateKey
-```
-
-It should not automatically convert every TypeScript import into an architecture edge.
-
-## Standalone use
-
-A future CLI should be able to expose the same engine, for example:
-
-```text
-archgraph scan ./project --json
-```
-
-The exact CLI syntax is not yet fixed.
+`view_settings` is transported as application-defined JSON values; the core does not interpret layout-specific keys.

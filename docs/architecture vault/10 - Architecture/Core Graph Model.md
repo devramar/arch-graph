@@ -2,16 +2,13 @@
 
 ## Goal
 
-The core graph format must be independent of Cytoscape.js, Tauri, React, and any other presentation layer.
+The core graph format is independent of Cytoscape.js, Tauri, React, source languages, and presentation choices.
 
-## Project
-
-Conceptually:
+## Graph
 
 ```ts
-interface ArchitectureGraph
-{
-    version: number;
+interface ArchitectureGraph {
+    version: 2;
     project: ProjectInfo;
     nodes: ArchitectureNode[];
     edges: ArchitectureEdge[];
@@ -19,70 +16,55 @@ interface ArchitectureGraph
 }
 ```
 
-This is illustrative rather than a frozen schema.
-
 ## Node kinds
 
 ### Architecture
 
-A documented subsystem declared by an `ARCH_NODE:` marker.
+A documented subsystem declared by a configured architecture-node marker, canonically `ARCH_NODE:`.
 
-### Module
+Architecture nodes may include the raw architecture document for consumers such as the desktop inspector.
 
-A concise code module or exported symbol that is useful as a dependency target but does not need its own architecture document.
+### Reference
 
-Example:
+A lightweight explicitly named concept with no unique architecture document target.
 
-```text
-DateKey
-```
+Reference nodes have one of two scopes:
 
-### External
+- `shared` — created by a normal reference and merged globally by explicit name.
+- `local` — created by a subreference; unique to the declaring architecture node and never merged or resolved by name.
 
-A dependency outside the scanned project.
+A missing architecture document is normal for reference nodes and does not produce an unresolved diagnostic.
 
-Examples may include frameworks, libraries, or external services.
+## Edges
 
-### Unresolved
+Every edge is an explicitly authored reference and has a `referenceKind`:
 
-A named dependency that could not be resolved uniquely.
+- `reference`
+- `subreference`
 
-Unresolved nodes are preserved so the graph remains inspectable even when documentation contains errors.
+The edge description belongs to the relationship, not to the destination node.
 
-## Edge
+## Resolution
 
-An edge represents an intentionally documented dependency.
+For a normal reference:
 
-Conceptually:
+1. exactly one matching architecture node → connect to it;
+2. no matching architecture node → connect to a shared lightweight reference node;
+3. multiple matching architecture nodes → connect to a shared reference node and emit an ambiguity diagnostic.
 
-```ts
-interface ArchitectureEdge
-{
-    source: NodeId;
-    target: NodeId;
+For a subreference:
 
-    description?: string;
-
-    sourceFile: string;
-    sourceLine?: number;
-}
-```
-
-The description belongs to the relationship.
-
-For example:
-
-```text
-EventSync ──uses DateKey to define sync windows──▶ DateKey
-```
+- always create a source-local reference node;
+- never resolve to an architecture node;
+- never merge with another subreference, even when names match.
 
 ## Diagnostics
 
-Diagnostics should report issues without preventing all useful graph output.
+Diagnostics describe malformed or genuinely ambiguous architecture data. Missing reference documents are not errors.
 
-Examples:
+Current codes:
 
-- ambiguous dependency
-- unresolved dependency
-- duplicate architecture node name
-- malformed marker
+- `ARCH001` duplicate architecture-node name
+- `ARCH002` ambiguous reference caused by duplicate architecture-node names
+- `ARCH004` architecture document without a node marker
+- `ARCH005` malformed/empty marker

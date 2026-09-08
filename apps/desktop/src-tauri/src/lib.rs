@@ -1,12 +1,25 @@
 use std::path::PathBuf;
 
-use archgraph_core::{ProjectConfiguration, ProjectScan};
+use archgraph_core::{
+    ArchitectureGraph, ArchitectureLayer, Diagnostic, LayerGroup, ProjectConfiguration,
+    ProjectInfo, ProjectScan,
+};
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 fn scan_project(root: String) -> Result<ProjectScan, String> {
     archgraph_core::scan_project_state(root).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn compose_project_layers(
+    project: ProjectInfo,
+    layers: Vec<ArchitectureLayer>,
+    diagnostics: Vec<Diagnostic>,
+    groups: Vec<LayerGroup>,
+) -> ArchitectureGraph {
+    archgraph_core::compose_project_layers(project, &layers, &diagnostics, &groups)
 }
 
 #[tauri::command]
@@ -49,6 +62,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             scan_project,
+            compose_project_layers,
             update_project_configuration,
             open_project_source
         ])

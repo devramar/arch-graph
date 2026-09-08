@@ -7,7 +7,7 @@ The system has two deliberately separate parts:
 1. A standalone Rust core that scans a project and produces a neutral architecture graph plus normalized project configuration.
 2. A desktop application that consumes those outputs and provides an interactive Cytoscape.js explorer.
 
-The graph is intentionally based on explicit architectural documentation rather than inferred source-code relationships.
+The graph is intentionally based on explicit architecture declarations rather than inferred source-code relationships. Declarations may live in dedicated Markdown sources or decorated blocks inside configured implementation files.
 
 ## Start here
 
@@ -26,9 +26,9 @@ The graph is intentionally based on explicit architectural documentation rather 
 
 ## Core idea
 
-Documented systems are architecture nodes.
+Explicitly declared systems/concepts are architecture nodes. Sources are discovered through logical layers and composed into one or more graph groups.
 
-Explicit `ARCH_REFERENCE:` declarations are directed graph edges. If the target has no architecture document, ArchGraph creates a valid shared lightweight reference node.
+Explicit `ARCH_REFERENCE:` declarations are directed graph edges. If the target has no matching architecture declaration in that composition group, ArchGraph creates a valid shared lightweight reference node.
 
 Explicit `ARCH_SUBREFERENCE:` declarations create source-local lightweight nodes that never merge by name.
 

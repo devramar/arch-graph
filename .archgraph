@@ -1,0 +1,53 @@
+{
+  "ignored_paths": [
+    "/crates/archgraph-core/tests/*"
+  ],
+  "layers": {
+    "architecture": {
+      "display_name": "Architecture",
+      "files": [
+        "ARCHITECTURE.md"
+      ],
+      "markers": {
+        "ARCH_NODE": [
+          "ARCH_NODE"
+        ],
+        "ARCH_REFERENCE": [
+          "ARCH_REFERENCE"
+        ],
+        "ARCH_SUBREFERENCE": [
+          "ARCH_SUBREFERENCE"
+        ]
+      }
+    }
+  },
+  "app_colours": {
+    "colour_overrides": {
+      "references": {},
+      "subreferences": {}
+    }
+  },
+  "default_view": "directed",
+  "view_settings": {
+    "desktop": {
+      "layer_groups": [
+        {
+          "enabled": true,
+          "id": "layer:architecture",
+          "layer_ids": [
+            "architecture"
+          ],
+          "name": "Architecture"
+        },
+        {
+          "enabled": true,
+          "id": "layer:test",
+          "layer_ids": [
+            "test"
+          ],
+          "name": "Test Layer"
+        }
+      ]
+    }
+  }
+}

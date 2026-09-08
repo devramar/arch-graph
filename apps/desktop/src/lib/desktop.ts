@@ -1,7 +1,16 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import type { ProjectConfiguration, ProjectScan, SourceLocation } from '../types';
+import type {
+    ArchitectureGraph,
+    ArchitectureLayer,
+    Diagnostic,
+    LayerCompositionGroup,
+    ProjectConfiguration,
+    ProjectInfo,
+    ProjectScan,
+    SourceLocation,
+} from '../types';
 
 export function desktopRuntimeAvailable(): boolean {
     return isTauri();
@@ -9,6 +18,20 @@ export function desktopRuntimeAvailable(): boolean {
 
 export async function scanProject(root: string): Promise<ProjectScan> {
     return invoke<ProjectScan>('scan_project', { root });
+}
+
+export async function composeProjectLayers(
+    project: ProjectInfo,
+    layers: ArchitectureLayer[],
+    diagnostics: Diagnostic[],
+    groups: LayerCompositionGroup[],
+): Promise<ArchitectureGraph> {
+    return invoke<ArchitectureGraph>('compose_project_layers', {
+        project,
+        layers,
+        diagnostics,
+        groups,
+    });
 }
 
 export async function updateProjectConfiguration(

@@ -1,26 +1,41 @@
 # Project Configuration
 
-A project may define one root `.archgraph` strict-JSON file. Nested configuration/inheritance is not supported in this version.
+## File
 
-If the file is absent, built-in defaults apply.
+ArchGraph optionally reads strict JSON from root `.archgraph`.
+
+Without the file, canonical defaults are used and the desktop keeps grouping/layout changes in memory only.
 
 ## Example
 
 ```json
 {
-  "aliasing": {
-    "ARCHITECTURE.md": ["DOCUMENTATION.md"],
-    "ARCH_NODE": ["SYS_NODE"],
-    "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
-    "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
+  "ignored_paths": [
+    "crates/archgraph-core/tests/fixtures/**",
+    "**/generated/**"
+  ],
+  "layers": {
+    "architecture": {
+      "display_name": "Architecture",
+      "files": ["DOCUMENTATION.md"],
+      "markers": {
+        "ARCH_NODE": ["SYS_NODE"],
+        "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
+        "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
+      }
+    },
+    "implementation": {
+      "display_name": "Implementation",
+      "files": ["*.ts", "*.tsx"]
+    }
   },
   "app_colours": {
     "colour_overrides": {
       "references": {
-        "Identity": "purple"
+        "Authentication": "blue"
       },
       "subreferences": {
-        "Password Management": "teal"
+        "Password Management": "purple"
       }
     }
   },
@@ -29,45 +44,92 @@ If the file is absent, built-in defaults apply.
     "sticky": {
       "reference_distance": 175,
       "subreference_distance": 68,
+      "node_spacing": 62,
       "subreference_attraction": 1.8
+    },
+    "desktop": {
+      "layer_groups": [
+        {
+          "id": "system",
+          "name": "Architecture + Implementation",
+          "enabled": true,
+          "layer_ids": ["architecture", "implementation"]
+        }
+      ]
     }
   }
 }
 ```
 
-## Aliasing semantics
+## Layers
 
-Each configured list replaces the default accepted spelling for that semantic concept.
+`layers` maps stable layer IDs to discovery configuration.
 
-For example:
+Each layer supports:
 
-```json
-"ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"]
+- `display_name`
+- `files`: candidate globs
+- `markers.ARCH_NODE`
+- `markers.ARCH_REFERENCE`
+- `markers.ARCH_SUBREFERENCE`
+
+The `architecture` layer always exists. If it is omitted, ArchGraph restores:
+
+```text
+display_name = Architecture
+files        = ARCHITECTURE.md
+markers      = canonical ARCH_* tokens
 ```
 
-means `ARCH_REFERENCE:` is no longer recognized unless it is explicitly included in the list.
+Other layers must define at least one file glob. Missing marker lists use canonical marker names.
 
-Aliases are normalized and must not collide across node/reference/subreference concepts. Architecture document aliases must be filenames rather than paths, and `.archgraph` itself is reserved for project configuration.
+Marker aliases replace the canonical list for that layer when explicitly supplied. Aliases cannot collide across node/reference/subreference concepts inside one layer.
+
+## Globs
+
+The current matcher supports simple path globs:
+
+- `*` — zero or more characters within one path segment
+- `?` — one character within one path segment
+- `**` — zero or more path segments
+
+Examples:
+
+```text
+*.ts
+src/**/*.rs
+crates/**/ARCHITECTURE.md
+```
+
+Basename-only file patterns such as `*.ts` match at any project depth.
+
+A source matching more than one layer is skipped with `ARCH007` rather than guessed.
+
+## Ignored paths
+
+`ignored_paths` uses the same simple glob matcher and combines with:
+
+- built-in exclusions (`.git`, `node_modules`, `dist`, `build`, `target`, `.expo`, `.next`)
+- Git ignore rules
+- `.archgraphignore`
 
 ## App colours
 
-`colour_overrides.references` and `colour_overrides.subreferences` map explicit node names to application palette names.
+`colour_overrides.references` and `colour_overrides.subreferences` map explicit names to application palette names.
 
-The desktop currently supplies a fixed pretty palette (`purple`, `blue`, `teal`, `green`, `orange`, `pink`, `red`, `indigo`). Unknown names fall back to deterministic name hashing.
+The desktop currently supplies: `purple`, `blue`, `teal`, `green`, `orange`, `pink`, `red`, `indigo`.
 
-## Views
+## Views and desktop session state
 
 `default_view` is an application-consumed string.
 
-`view_settings` is deliberately an opaque object from the Rust core's perspective. Each app may define the keys it understands. The desktop currently understands:
+`view_settings` is deliberately opaque to the Rust core. The desktop currently stores:
 
-- `reference_distance`
-- `subreference_distance`
-- `node_spacing`
-- `subreference_attraction`
+- layout tuning (`reference_distance`, `subreference_distance`, `node_spacing`, `subreference_attraction`)
+- `desktop.layer_groups` for persisted grouping/visibility
 
-for `directed`, `organic`, and `sticky` view objects where applicable. Higher `subreference_attraction` values pull local subreferences more strongly in force-directed layouts.
+Without `.archgraph`, the desktop does not write session state. Its Create `.archgraph` action writes the current configuration plus current grouping/layout through the core.
 
 ## Writes
 
-Apps should write `.archgraph` through the Rust core rather than directly accessing the project filesystem. The core validates and normalizes configuration before replacing the file. Apps should rescan after a successful write because syntax aliases can change which documents and markers participate in the graph.
+Apps should write `.archgraph` through `write_project_configuration(...)` / the Tauri configuration command. The core normalizes and validates strict JSON before atomically replacing the file.

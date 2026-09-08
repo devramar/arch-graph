@@ -2,41 +2,53 @@
 
 ## Required
 
-- standalone Rust scanning core
-- neutral schema-v2 graph model
+- standalone Rust scanning/composition core
+- neutral schema-v3 graph model
 - JSON serialization
-- optional root `.archgraph` configuration
-- configurable architecture document filenames
-- configurable node/reference/subreference marker aliases
-- Rust-owned `.archgraph` read/validate/write path
+- optional root `.archgraph`
+- root-scoped logical layers
+- per-layer file globs and marker aliases
+- ignored-path globs
+- Markdown source parser
+- generic decorated-text source parser
+- one source → at most one node declaration
+- independently scanned layer graphs
+- core-owned layer-group composition
+- multi-declaration merged architecture nodes
 - explicit shared references
 - explicit non-merging local subreferences
-- no programming-language source resolution
-- desktop Tauri application
-- drag/drop project root and folder picker
-- reference descriptions preserved on edges
-- duplicate/ambiguous architecture diagnostics
-- Cytoscape rendering
-- deterministic reference colours and project colour overrides
+- no programming-language semantic parsing
+- Rust-owned `.archgraph` read/validate/write path
+- desktop drag/drop project opening
+- desktop drag/drop layer grouping
+- simultaneous visible group regions
+- inspector tabs for merged declarations
+- session-only mode without `.archgraph`
+- persisted desktop grouping/layout when `.archgraph` exists
+- deterministic reference colours and overrides
 - destination-coloured edge arrows
-- subreference visual/layout distinction
-- search, filters, inspector, and fully offline normal operation
+- search, filters, diagnostics, source opening, fully offline normal operation
 
 ## Explicitly not required
 
 - inferred import edges
 - source-language AST/type-system integration
+- multiple architecture nodes in one source file
 - nested `.archgraph` inheritance
-- editable palette definitions in `.archgraph`
-- full settings UI
+- regex discovery rules
+- language-specific parsers beyond generic Markdown/decorated dispatch
+- editable palette definitions
+- full layer-definition settings editor
 - live filesystem watching
 - Git integration
 - hosted web service
 
 ## Later possibilities
 
-- settings editor using the existing configuration-write command
+- dedicated parsers for additional source/document formats
+- multiple declarations per source file
+- richer layer settings editor
 - palette extension/replacement configuration
 - graph export/import
-- filesystem watching and incremental rescan
+- filesystem watching/incremental rescan
 - persisted manual node positions

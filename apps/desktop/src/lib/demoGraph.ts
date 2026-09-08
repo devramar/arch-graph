@@ -1,12 +1,115 @@
 import type { ProjectScan } from '../types';
 
+const project = {
+    name: 'demo-events',
+    root: '/demo/events',
+};
+
+const graph = {
+    version: 3,
+    project,
+    groups: [
+        { id: 'all', name: 'Architecture', layerIds: ['architecture'] },
+    ],
+    nodes: [
+        {
+            id: 'group:all:architecture:Events',
+            name: 'Events',
+            kind: 'architecture' as const,
+            groupId: 'all',
+            declarations: [
+                {
+                    layerId: 'architecture',
+                    layerName: 'Architecture',
+                    source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
+                    documentation: '# Events\n\nARCH_NODE:Events\n\nCoordinates the event feature and its major subsystems.\n',
+                    sourceFormat: 'markdown' as const,
+                },
+            ],
+        },
+        {
+            id: 'group:all:architecture:EventSync',
+            name: 'EventSync',
+            kind: 'architecture' as const,
+            groupId: 'all',
+            declarations: [
+                {
+                    layerId: 'architecture',
+                    layerName: 'Architecture',
+                    source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
+                    documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\nARCH_REFERENCE:DateKey\n\nUsed as the canonical day representation.\n',
+                    sourceFormat: 'markdown' as const,
+                },
+            ],
+        },
+        {
+            id: 'group:all:reference:DateKey',
+            name: 'DateKey',
+            kind: 'reference' as const,
+            groupId: 'all',
+            referenceScope: 'shared' as const,
+            declarations: [],
+        },
+        {
+            id: 'group:all:subref:architecture:passwords',
+            name: 'Password Management',
+            kind: 'reference' as const,
+            groupId: 'all',
+            referenceScope: 'local' as const,
+            declarations: [],
+        },
+    ],
+    edges: [
+        {
+            id: 'group:all:architecture:events-sync',
+            source: 'group:all:architecture:Events',
+            target: 'group:all:architecture:EventSync',
+            targetName: 'EventSync',
+            groupId: 'all',
+            layerId: 'architecture',
+            description: 'Delegates remote reconciliation to the synchronization subsystem.',
+            sourceLocation: { file: 'src/features/events/ARCHITECTURE.md', line: 12 },
+            referenceKind: 'reference' as const,
+        },
+        {
+            id: 'group:all:architecture:sync-datekey',
+            source: 'group:all:architecture:EventSync',
+            target: 'group:all:reference:DateKey',
+            targetName: 'DateKey',
+            groupId: 'all',
+            layerId: 'architecture',
+            description: 'Used as the canonical day representation when constructing synchronization windows.',
+            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 8 },
+            referenceKind: 'reference' as const,
+        },
+        {
+            id: 'group:all:architecture:sync-passwords',
+            source: 'group:all:architecture:EventSync',
+            target: 'group:all:subref:architecture:passwords',
+            targetName: 'Password Management',
+            groupId: 'all',
+            layerId: 'architecture',
+            description: 'Keeps password management scoped to EventSync.',
+            sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 12 },
+            referenceKind: 'subreference' as const,
+        },
+    ],
+    diagnostics: [],
+};
+
 export const demoScan: ProjectScan = {
     configuration: {
-        aliasing: {
-            'ARCHITECTURE.md': ['ARCHITECTURE.md'],
-            ARCH_NODE: ['ARCH_NODE'],
-            ARCH_REFERENCE: ['ARCH_REFERENCE'],
-            ARCH_SUBREFERENCE: ['ARCH_SUBREFERENCE'],
+        ignored_paths: [],
+        layers: {
+            architecture: {
+                display_name: 'Architecture',
+                files: ['ARCHITECTURE.md'],
+                markers: {
+                    ARCH_NODE: ['ARCH_NODE'],
+                    ARCH_REFERENCE: ['ARCH_REFERENCE'],
+                    ARCH_SUBREFERENCE: ['ARCH_SUBREFERENCE'],
+                },
+            },
         },
         app_colours: {
             colour_overrides: {
@@ -17,92 +120,16 @@ export const demoScan: ProjectScan = {
             },
         },
         default_view: 'sticky',
-        view_settings: {
-            sticky: {
-                reference_distance: 175,
-                subreference_distance: 68,
-                subreference_attraction: 1.8,
-            },
-        },
+        view_settings: {},
     },
-    graph: {
-        version: 2,
-        project: {
-            name: 'demo-events',
-            root: '/demo/events',
+    configurationExists: false,
+    diagnostics: [],
+    layers: [
+        {
+            id: 'architecture',
+            displayName: 'Architecture',
+            graph,
         },
-        nodes: [
-            {
-                id: 'arch:events#Events',
-                name: 'Events',
-                kind: 'architecture',
-                source: { file: 'src/features/events/ARCHITECTURE.md', line: 3 },
-                documentation: '# Events\n\nARCH_NODE:Events\n\n## Description\n\nCoordinates the event feature and its major subsystems.\n',
-            },
-            {
-                id: 'arch:sync#EventSync',
-                name: 'EventSync',
-                kind: 'architecture',
-                source: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 3 },
-                documentation: '# Event Synchronization\n\nARCH_NODE:EventSync\n\n## References\n\nARCH_REFERENCE:DateKey\n\nUsed as the canonical day representation when constructing synchronization windows.\n',
-            },
-            {
-                id: 'reference:DateKey',
-                name: 'DateKey',
-                kind: 'reference',
-                referenceScope: 'shared',
-            },
-            {
-                id: 'reference:EventStore',
-                name: 'EventStore',
-                kind: 'reference',
-                referenceScope: 'shared',
-            },
-            {
-                id: 'subref:arch:sync#EventSync:2#Password Management',
-                name: 'Password Management',
-                kind: 'reference',
-                referenceScope: 'local',
-            },
-        ],
-        edges: [
-            {
-                id: 'edge:events:sync',
-                source: 'arch:events#Events',
-                target: 'arch:sync#EventSync',
-                targetName: 'EventSync',
-                description: 'Delegates remote reconciliation to the synchronization subsystem.',
-                sourceLocation: { file: 'src/features/events/ARCHITECTURE.md', line: 31 },
-                referenceKind: 'reference',
-            },
-            {
-                id: 'edge:sync:datekey',
-                source: 'arch:sync#EventSync',
-                target: 'reference:DateKey',
-                targetName: 'DateKey',
-                description: 'Used as the canonical day representation when constructing synchronization windows.',
-                sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 24 },
-                referenceKind: 'reference',
-            },
-            {
-                id: 'edge:sync:store',
-                source: 'arch:sync#EventSync',
-                target: 'reference:EventStore',
-                targetName: 'EventStore',
-                description: 'Provides the local event state against which synchronization results are reconciled.',
-                sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 28 },
-                referenceKind: 'reference',
-            },
-            {
-                id: 'edge:sync:passwords',
-                source: 'arch:sync#EventSync',
-                target: 'subref:arch:sync#EventSync:2#Password Management',
-                targetName: 'Password Management',
-                description: 'Keeps password management scoped to EventSync rather than merging it across the graph.',
-                sourceLocation: { file: 'src/features/events/sync/ARCHITECTURE.md', line: 32 },
-                referenceKind: 'subreference',
-            },
-        ],
-        diagnostics: [],
-    },
+    ],
+    graph,
 };

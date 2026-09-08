@@ -4,67 +4,76 @@
 
 The core graph format is independent of Cytoscape.js, Tauri, React, source languages, and presentation choices.
 
-## Graph
+Graph format version `3` adds declaration provenance and layer-composition groups.
 
 ```ts
 interface ArchitectureGraph {
-    version: 2;
+    version: 3;
     project: ProjectInfo;
+    groups: GraphGroup[];
     nodes: ArchitectureNode[];
     edges: ArchitectureEdge[];
     diagnostics: Diagnostic[];
 }
 ```
 
+## Architecture declarations
+
+An architecture node may be backed by one or more declarations:
+
+```ts
+interface ArchitectureDeclaration {
+    layerId: string;
+    layerName: string;
+    source: SourceLocation;
+    documentation?: string;
+    sourceFormat: 'markdown' | 'decoratedText';
+}
+```
+
+A merged node therefore retains every contributing source rather than selecting one winner.
+
 ## Node kinds
 
 ### Architecture
 
-A documented subsystem declared by a configured architecture-node marker, canonically `ARCH_NODE:`.
+A named architectural concept established by an explicit configured node marker.
 
-Architecture nodes may include the raw architecture document for consumers such as the desktop inspector.
+Within one composition group, matching names from different layers merge when each contributing layer has a unique declaration for that name.
 
 ### Reference
 
-A lightweight explicitly named concept with no unique architecture document target.
+A lightweight explicitly named concept with no unique architecture target in its group.
 
-Reference nodes have one of two scopes:
+Reference scopes:
 
-- `shared` — created by a normal reference and merged globally by explicit name.
-- `local` — created by a subreference; unique to the declaring architecture node and never merged or resolved by name.
+- `shared` — normal references merge by explicit name inside the group.
+- `local` — subreferences remain unique to their declaring source.
 
-A missing architecture document is normal for reference nodes and does not produce an unresolved diagnostic.
+Missing architecture declarations are normal for shared reference nodes.
+
+## Groups
+
+Every graph node/edge belongs to a composition `groupId`.
+
+Layers inside one group participate in name matching. Different groups are isolated semantic namespaces and may be rendered simultaneously.
 
 ## Edges
 
-Every edge is an explicitly authored reference and has a `referenceKind`:
+Every edge is explicitly authored and has:
 
-- `reference`
-- `subreference`
-
-The edge description belongs to the relationship, not to the destination node.
-
-## Resolution
-
-For a normal reference:
-
-1. exactly one matching architecture node → connect to it;
-2. no matching architecture node → connect to a shared lightweight reference node;
-3. multiple matching architecture nodes → connect to a shared reference node and emit an ambiguity diagnostic.
-
-For a subreference:
-
-- always create a source-local reference node;
-- never resolve to an architecture node;
-- never merge with another subreference, even when names match.
+- `referenceKind`: `reference` or `subreference`
+- `layerId`: layer containing the source declaration
+- `groupId`: composition group in which the edge was materialized
+- edge-owned description and source location
 
 ## Diagnostics
 
-Diagnostics describe malformed or genuinely ambiguous architecture data. Missing reference documents are not errors.
-
 Current codes:
 
-- `ARCH001` duplicate architecture-node name
-- `ARCH002` ambiguous reference caused by duplicate architecture-node names
-- `ARCH004` architecture document without a node marker
+- `ARCH001` duplicate architecture-node name inside one layer
+- `ARCH002` ambiguous reference
+- `ARCH004` marker-bearing source without a node marker
 - `ARCH005` malformed/empty marker
+- `ARCH006` more than one architecture node marker in one source
+- `ARCH007` source matched more than one configured layer

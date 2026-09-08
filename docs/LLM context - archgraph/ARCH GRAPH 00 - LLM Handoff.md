@@ -2,15 +2,40 @@
 
 ## Product definition
 
-ArchGraph is an offline architecture-reference explorer. It scans explicitly authored architecture documents and turns explicitly authored named references into a directed graph.
+ArchGraph is an offline architecture-reference explorer. It discovers explicitly authored architecture declarations from configured source files, organises them into logical layers, and composes selected layer groups into directed graphs.
 
 The core rule is:
 
-> ArchGraph understands architecture documentation, not programming languages.
+> ArchGraph understands explicit architecture annotations, not programming languages.
 
-Do not infer architecture from imports, exports, modules, package manifests, ASTs, or language-server data.
+Do not infer architecture from imports, exports, ASTs, package manifests, or language-server data.
 
-## Canonical document markers
+## Source pipeline
+
+```text
+files -> declarations -> layers -> composition groups -> graph
+```
+
+A configured file glob only makes a file a candidate. A candidate containing no ArchGraph markers is ignored silently.
+
+Markdown (`.md` / `.markdown`) uses the Markdown source parser. Every other file currently uses the generic decorated-text parser. Parser dispatch is centralized so more specialized source formats can be added later.
+
+Decorated sources require markers to be the first meaningful content after a punctuation-only decoration prefix, for example:
+
+```ts
+/// ARCH_NODE:DateKey
+///
+/// Handles dates in canonical YYYY-MM-DD form.
+///
+/// ARCH_REFERENCE:Clock
+/// Used when deriving today's date.
+```
+
+The parser does not know what `///` means in TypeScript or Rust. It only observes a decoration prefix and consumes adjacent prose that uses the same prefix. A string such as `const x = "ARCH_NODE:Fake"` is not a declaration.
+
+One source file may currently declare at most one node.
+
+## Canonical markers
 
 ```text
 ARCH_NODE:Name
@@ -18,57 +43,39 @@ ARCH_REFERENCE:Name
 ARCH_SUBREFERENCE:Name
 ```
 
-The markers may be replaced through root `.archgraph` aliases. `## References` is only a recommended human-facing section and does not gate marker recognition; Markdown boundaries are used only to delimit adjacent prose.
+Marker spellings are configured independently per layer. Markdown headings such as `## References` are authoring conventions only.
 
-## Architecture nodes
+## Reference semantics
 
-`ARCH_NODE:EventSync` establishes a documented architecture node named `EventSync`.
+`ARCH_REFERENCE:X` creates a mergeable named reference. Within a composition group:
 
-Architecture-node names are the only names normal references may resolve to as documented targets.
+1. exactly one eligible architecture declaration named `X` -> target that architecture node;
+2. none -> target one shared lightweight reference node named `X`;
+3. duplicate declarations within a contributing layer -> do not guess; preserve ambiguity and emit a diagnostic.
 
-## Normal references
+Missing architecture declarations are normal and are not unresolved errors.
 
-```text
-ARCH_REFERENCE:EventStore
-```
+`ARCH_SUBREFERENCE:X` always creates a local lightweight satellite node. It never resolves or merges, even when names match. Same-name subreferences have distinct graph IDs but deliberately share deterministic colour identity in the desktop app.
 
-creates one authored edge from the declaring architecture node to the explicit name `EventStore`.
+## Layers and composition
 
-Resolution semantics:
-
-1. exactly one architecture document declares `ARCH_NODE:EventStore` → target that architecture node;
-2. no architecture document declares it → create/use one globally shared lightweight reference node named `EventStore`;
-3. multiple architecture documents declare it → target a lightweight reference node and emit an ambiguity diagnostic rather than guessing.
-
-Missing architecture documentation is normal. It is not an unresolved error.
-
-The prose beneath the marker describes the edge:
-
-```markdown
-ARCH_REFERENCE:EventStore
-
-Provides persisted local event state used during reconciliation.
-```
-
-## Subreferences
+`.archgraph` defines logical layers. The built-in `architecture` layer always exists and defaults to:
 
 ```text
-ARCH_SUBREFERENCE:Password Management
+display name: Architecture
+files:        ARCHITECTURE.md
+markers:      ARCH_NODE / ARCH_REFERENCE / ARCH_SUBREFERENCE
 ```
 
-creates a lightweight local satellite node owned by that declaration's source architecture node.
+Additional layers may discover implementation files, overview documents, security notes, etc.
 
-Subreference invariants:
+Layers are scanned independently. The Rust core also owns composition semantics. A desktop composition group can combine multiple layers; same-name architecture declarations in those layers become one graph node with multiple declarations. Separate enabled groups remain independent and may be displayed simultaneously.
 
-- never resolve to an `ARCH_NODE`;
-- never merge with another subreference by name;
-- never merge with a normal shared reference by name;
-- two same-name subreferences have different graph node IDs;
-- same-name subreferences deliberately share deterministic visual colour identity in the desktop app.
+Merged nodes retain every contributing declaration. The desktop inspector presents those declarations as tabs.
 
-`ARCH_SUBREFERENCE` does not mean a child of the previous reference. It means source-local/non-merging reference.
+Subreferences never merge across layers or groups.
 
-## Graph v2
+## Graph v3
 
 Node kinds:
 
@@ -77,7 +84,7 @@ architecture
 reference
 ```
 
-Reference-node scopes:
+Reference scopes:
 
 ```text
 shared
@@ -91,45 +98,60 @@ reference
 subreference
 ```
 
-There are no module, external, or unresolved node kinds in graph v2.
+Architecture nodes contain `declarations[]`, each recording layer provenance, source location, source format, and extracted documentation. Graphs also contain composition `groups[]`; nodes/edges carry group provenance.
 
-There is no edge-resolution field. Every edge is an authored reference; the destination node type tells the consumer what it currently points at.
-
-Current diagnostics:
+Diagnostics currently include:
 
 ```text
 ARCH001 duplicate architecture node name
-ARCH002 ambiguous normal reference due to duplicate architecture nodes
-ARCH004 architecture document missing a node marker
+ARCH002 ambiguous normal reference
+ARCH004 marker-bearing source without a valid node marker
 ARCH005 malformed/empty marker
+ARCH006 multiple node markers in one source
+ARCH007 one source matched by multiple layers
 ```
 
 ## `.archgraph`
 
-One optional strict-JSON `.archgraph` file may exist at the selected project root. There is no nested/inherited configuration in this version.
+One optional strict-JSON `.archgraph` may exist at the selected project root. There is no nested/inherited configuration.
 
 Example:
 
 ```json
 {
-  "aliasing": {
-    "ARCHITECTURE.md": ["DOCUMENTATION.md"],
-    "ARCH_NODE": ["SYS_NODE"],
-    "ARCH_REFERENCE": ["SYS_REF", "ARCH_REF"],
-    "ARCH_SUBREFERENCE": ["SYS_LOCAL"]
+  "ignored_paths": [
+    "crates/archgraph-core/tests/fixtures/**"
+  ],
+  "layers": {
+    "architecture": {
+      "display_name": "Architecture",
+      "files": ["ARCHITECTURE.md"]
+    },
+    "implementation": {
+      "display_name": "Implementation",
+      "files": ["*.ts", "*.tsx", "*.rs"]
+    },
+    "overview": {
+      "display_name": "Overview",
+      "files": ["OVERVIEW.md"],
+      "markers": {
+        "ARCH_NODE": ["OVERVIEW_NODE"],
+        "ARCH_REFERENCE": ["OVERVIEW_REFERENCE"],
+        "ARCH_SUBREFERENCE": ["OVERVIEW_SUBREFERENCE"]
+      }
+    }
   },
   "app_colours": {
     "colour_overrides": {
-      "references": {
-        "Identity": "purple"
-      },
-      "subreferences": {
-        "Password Management": "teal"
-      }
+      "references": { "Identity": "purple" },
+      "subreferences": { "Password Management": "teal" }
     }
   },
   "default_view": "sticky",
   "view_settings": {
+    "desktop": {
+      "layer_groups": []
+    },
     "sticky": {
       "reference_distance": 175,
       "subreference_distance": 68,
@@ -139,125 +161,34 @@ Example:
 }
 ```
 
-Alias lists replace defaults. If `ARCH_REFERENCE` is configured as `["SYS_REF"]`, the canonical `ARCH_REFERENCE:` spelling is no longer accepted unless it is also listed.
+File entries and `ignored_paths` use ArchGraph's glob matcher (`*`, `?`, `**`). Regex is not supported.
 
-The Rust core owns configuration parsing, validation, normalization, and writes.
+The Rust core owns configuration parsing, normalization, validation, and writes. `view_settings` is opaque application data.
 
-`view_settings` is intentionally opaque application data. The core transports it without understanding layout-specific keys.
+## Desktop persistence
 
-## Desktop colour semantics
+Without `.archgraph`, the desktop is session-only: layer grouping, visibility, and layout changes are not written to the project.
 
-The desktop has a fixed built-in pretty palette. Shared references and subreferences choose a colour deterministically from their explicit names unless `.archgraph` gives a named override.
+The user may explicitly choose **Create `.archgraph` · save this session**. After a configuration file exists, desktop layer groups and current view can be persisted through the Rust core.
 
-The current built-in names are:
+## Desktop visual semantics
 
-```text
-purple
-blue
-teal
-green
-orange
-pink
-red
-indigo
-```
+Enabled composition groups are shown simultaneously as soft labelled graph regions. A region represents a composition group, not a source layer. Dragging one layer onto another group's region makes them compose and therefore allows same-name declarations to merge.
 
-For all edges:
-
-> target arrow colour = destination node primary colour
-
-Architecture nodes use the architecture colour pair. Reference/subreference nodes use their deterministic/overridden pair.
-
-Subreferences are smaller dashed ellipse nodes.
-
-## Layout semantics
-
-Desktop views:
-
-```text
-directed
-organic
-sticky
-```
-
-Normal reference spacing is intentionally larger than before. Local subreference edges use shorter ideal lengths; force layouts also apply stronger attraction so subreferences remain satellite-like around their owner.
-
-Desktop `view_settings` currently understands:
-
-```text
-reference_distance
-subreference_distance
-node_spacing
-subreference_attraction
-```
+Every edge arrow uses the primary colour of its destination node. Subreferences are smaller dashed ellipse nodes and stay closer to their owner in force layouts.
 
 ## Repository boundaries
 
 `crates/archgraph-core`
-: project/configuration scanning and graph semantics.
+: discovery, parsing, layers, composition, diagnostics, `.archgraph` I/O, graph semantics.
 
 `crates/archgraph-cli`
-: standalone graph JSON consumer.
+: simple default-composed JSON graph consumer.
 
 `apps/desktop/src-tauri`
-: narrow native adapter around the core.
+: narrow native adapter around core operations.
 
 `apps/desktop/src`
-: React/Cytoscape presentation and interaction.
+: React/Cytoscape presentation, drag/drop grouping, tabs, session persistence UX.
 
-The frontend must not implement filesystem scanning or reference resolution.
-
-## Important Rust files
-
-`src/config.rs`
-: `.archgraph` defaults, strict parsing, alias validation, normalization, writes.
-
-`src/model.rs`
-: graph v2 data contract.
-
-`src/parser.rs`
-: configurable token parsing and reference prose extraction.
-
-`src/resolver.rs`
-: architecture/shared/local reference resolution.
-
-`src/scanner.rs`
-: project traversal and graph assembly.
-
-## Important desktop files
-
-`src/types.ts`
-: TypeScript representation of graph v2 and project configuration.
-
-`src/components/GraphCanvas.tsx`
-: deterministic colours, destination arrow colours, layouts, search/filter rendering, interactions.
-
-`src/components/Inspector.tsx`
-: architecture/reference/subreference inspection.
-
-`src/lib/desktop.ts`
-: Tauri calls including scan and configuration update.
-
-`src-tauri/src/lib.rs`
-: native commands backed by the Rust core.
-
-## Authoring philosophy
-
-Use a normal reference when multiple architecture nodes truly refer to the same named concept and convergence is useful.
-
-Use a subreference when the concept is local explanatory context and graph-wide merging would create misleading hubs.
-
-Examples of useful reference names are not limited to code modules:
-
-```text
-Identity
-PCI DSS
-Data Retention Policy
-Password Management
-Observability
-AWS Region
-Incident Management
-Customer Data
-```
-
-The system is deliberately suitable for application code, infrastructure repositories, systems documentation, or mixed repositories without needing any language plugin.
+The frontend must not implement filesystem discovery or reference-composition semantics.

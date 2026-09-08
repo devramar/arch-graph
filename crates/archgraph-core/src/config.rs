@@ -8,39 +8,71 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 pub const PROJECT_CONFIG_FILENAME: &str = ".archgraph";
+pub const DEFAULT_LAYER_ID: &str = "architecture";
 
 pub type ViewSettings = BTreeMap<String, Value>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct ProjectConfiguration {
-    pub aliasing: AliasingConfiguration,
+    pub ignored_paths: Vec<String>,
+    pub layers: BTreeMap<String, LayerConfiguration>,
     pub app_colours: AppColoursConfiguration,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_view: Option<String>,
     pub view_settings: ViewSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default, deny_unknown_fields)]
-pub struct AliasingConfiguration {
-    #[serde(rename = "ARCHITECTURE.md")]
-    pub architecture_files: Vec<String>,
-    #[serde(rename = "ARCH_NODE")]
-    pub node_markers: Vec<String>,
-    #[serde(rename = "ARCH_REFERENCE")]
-    pub reference_markers: Vec<String>,
-    #[serde(rename = "ARCH_SUBREFERENCE")]
-    pub subreference_markers: Vec<String>,
-}
-
-impl Default for AliasingConfiguration {
+impl Default for ProjectConfiguration {
     fn default() -> Self {
         Self {
-            architecture_files: vec!["ARCHITECTURE.md".to_owned()],
-            node_markers: vec!["ARCH_NODE".to_owned()],
-            reference_markers: vec!["ARCH_REFERENCE".to_owned()],
-            subreference_markers: vec!["ARCH_SUBREFERENCE".to_owned()],
+            ignored_paths: Vec::new(),
+            layers: BTreeMap::from([(
+                DEFAULT_LAYER_ID.to_owned(),
+                LayerConfiguration::default_architecture(),
+            )]),
+            app_colours: AppColoursConfiguration::default(),
+            default_view: None,
+            view_settings: BTreeMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct LayerConfiguration {
+    pub display_name: String,
+    pub files: Vec<String>,
+    pub markers: MarkerConfiguration,
+}
+
+impl LayerConfiguration {
+    fn default_architecture() -> Self {
+        Self {
+            display_name: "Architecture".to_owned(),
+            files: vec!["ARCHITECTURE.md".to_owned()],
+            markers: MarkerConfiguration::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct MarkerConfiguration {
+    #[serde(rename = "ARCH_NODE")]
+    pub node: Vec<String>,
+    #[serde(rename = "ARCH_REFERENCE")]
+    pub reference: Vec<String>,
+    #[serde(rename = "ARCH_SUBREFERENCE")]
+    pub subreference: Vec<String>,
+}
+
+impl Default for MarkerConfiguration {
+    fn default() -> Self {
+        Self {
+            node: vec!["ARCH_NODE".to_owned()],
+            reference: vec!["ARCH_REFERENCE".to_owned()],
+            subreference: vec!["ARCH_SUBREFERENCE".to_owned()],
         }
     }
 }
@@ -85,7 +117,7 @@ pub fn load_project_configuration(
     root: impl AsRef<Path>,
 ) -> Result<ProjectConfiguration, ConfigurationError> {
     let root = canonical_project_root(root.as_ref())?;
-    load_project_configuration_from_root(&root)
+    Ok(load_project_configuration_state_from_root(&root)?.0)
 }
 
 pub fn write_project_configuration(
@@ -125,12 +157,12 @@ pub fn write_project_configuration(
     Ok(configuration)
 }
 
-pub(crate) fn load_project_configuration_from_root(
+pub(crate) fn load_project_configuration_state_from_root(
     root: &Path,
-) -> Result<ProjectConfiguration, ConfigurationError> {
+) -> Result<(ProjectConfiguration, bool), ConfigurationError> {
     let path = root.join(PROJECT_CONFIG_FILENAME);
     if !validate_configuration_path(&path)? {
-        return Ok(ProjectConfiguration::default());
+        return Ok((ProjectConfiguration::default(), false));
     }
 
     let contents = fs::read_to_string(&path).map_err(|source| ConfigurationError::Read {
@@ -143,7 +175,7 @@ pub(crate) fn load_project_configuration_from_root(
             source,
         }
     })?;
-    normalize_and_validate(parsed)
+    Ok((normalize_and_validate(parsed)?, true))
 }
 
 fn validate_configuration_path(path: &Path) -> Result<bool, ConfigurationError> {
@@ -222,60 +254,70 @@ fn canonical_project_root(root: &Path) -> Result<PathBuf, ConfigurationError> {
 fn normalize_and_validate(
     mut configuration: ProjectConfiguration,
 ) -> Result<ProjectConfiguration, ConfigurationError> {
-    normalize_list(&mut configuration.aliasing.architecture_files);
-    normalize_list(&mut configuration.aliasing.node_markers);
-    normalize_list(&mut configuration.aliasing.reference_markers);
-    normalize_list(&mut configuration.aliasing.subreference_markers);
+    normalize_path_list(&mut configuration.ignored_paths);
 
-    validate_non_empty_list(
-        "aliasing.ARCHITECTURE.md",
-        &configuration.aliasing.architecture_files,
-    )?;
-    validate_non_empty_list("aliasing.ARCH_NODE", &configuration.aliasing.node_markers)?;
-    validate_non_empty_list(
-        "aliasing.ARCH_REFERENCE",
-        &configuration.aliasing.reference_markers,
-    )?;
-    validate_non_empty_list(
-        "aliasing.ARCH_SUBREFERENCE",
-        &configuration.aliasing.subreference_markers,
-    )?;
+    configuration
+        .layers
+        .entry(DEFAULT_LAYER_ID.to_owned())
+        .or_insert_with(LayerConfiguration::default_architecture);
 
-    for filename in &configuration.aliasing.architecture_files {
-        if filename == "."
-            || filename == ".."
-            || filename == PROJECT_CONFIG_FILENAME
-            || filename.contains('/')
-            || filename.contains('\\')
-        {
+    for (layer_id, layer) in &mut configuration.layers {
+        let normalized_id = layer_id.trim();
+        if normalized_id.is_empty() || normalized_id != layer_id {
             return Err(ConfigurationError::Invalid(format!(
-                "architecture document alias must be a filename, got {filename:?}"
+                "layer id {layer_id:?} must be non-empty and may not have surrounding whitespace"
             )));
         }
-    }
+        if layer_id.chars().any(char::is_whitespace) {
+            return Err(ConfigurationError::Invalid(format!(
+                "layer id {layer_id:?} may not contain whitespace"
+            )));
+        }
 
-    let marker_groups = [
-        ("ARCH_NODE", &configuration.aliasing.node_markers),
-        ("ARCH_REFERENCE", &configuration.aliasing.reference_markers),
-        (
-            "ARCH_SUBREFERENCE",
-            &configuration.aliasing.subreference_markers,
-        ),
-    ];
-    let mut owners: HashMap<&str, &str> = HashMap::new();
-    for (semantic_name, markers) in marker_groups {
-        for marker in markers {
-            if marker.contains(':') || marker.contains('\n') || marker.contains('\r') {
+        layer.display_name = layer.display_name.trim().to_owned();
+        if layer.display_name.is_empty() {
+            layer.display_name = if layer_id == DEFAULT_LAYER_ID {
+                "Architecture".to_owned()
+            } else {
+                humanize_layer_id(layer_id)
+            };
+        }
+
+        normalize_path_list(&mut layer.files);
+        if layer.files.is_empty() && layer_id == DEFAULT_LAYER_ID {
+            layer.files.push("ARCHITECTURE.md".to_owned());
+        }
+        validate_non_empty_list(&format!("layers.{layer_id}.files"), &layer.files)?;
+        for pattern in &layer.files {
+            validate_glob_pattern(pattern, &format!("layers.{layer_id}.files"))?;
+            if pattern == PROJECT_CONFIG_FILENAME {
                 return Err(ConfigurationError::Invalid(format!(
-                    "marker alias {marker:?} for {semantic_name} may not contain ':' or a newline"
-                )));
-            }
-            if let Some(existing) = owners.insert(marker.as_str(), semantic_name) {
-                return Err(ConfigurationError::Invalid(format!(
-                    "marker alias {marker:?} is assigned to both {existing} and {semantic_name}"
+                    "{} may not be enrolled as an architecture source",
+                    PROJECT_CONFIG_FILENAME
                 )));
             }
         }
+
+        normalize_string_list(&mut layer.markers.node);
+        normalize_string_list(&mut layer.markers.reference);
+        normalize_string_list(&mut layer.markers.subreference);
+        validate_non_empty_list(
+            &format!("layers.{layer_id}.markers.ARCH_NODE"),
+            &layer.markers.node,
+        )?;
+        validate_non_empty_list(
+            &format!("layers.{layer_id}.markers.ARCH_REFERENCE"),
+            &layer.markers.reference,
+        )?;
+        validate_non_empty_list(
+            &format!("layers.{layer_id}.markers.ARCH_SUBREFERENCE"),
+            &layer.markers.subreference,
+        )?;
+        validate_marker_groups(layer_id, &layer.markers)?;
+    }
+
+    for pattern in &configuration.ignored_paths {
+        validate_glob_pattern(pattern, "ignored_paths")?;
     }
 
     normalize_colour_overrides(&mut configuration.app_colours.colour_overrides.references)?;
@@ -293,9 +335,76 @@ fn normalize_and_validate(
     Ok(configuration)
 }
 
-fn normalize_list(values: &mut Vec<String>) {
+fn validate_marker_groups(
+    layer_id: &str,
+    markers: &MarkerConfiguration,
+) -> Result<(), ConfigurationError> {
+    let marker_groups = [
+        ("ARCH_NODE", &markers.node),
+        ("ARCH_REFERENCE", &markers.reference),
+        ("ARCH_SUBREFERENCE", &markers.subreference),
+    ];
+    let mut owners: HashMap<&str, &str> = HashMap::new();
+    for (semantic_name, aliases) in marker_groups {
+        for marker in aliases {
+            if marker.contains(':') || marker.contains('\n') || marker.contains('\r') {
+                return Err(ConfigurationError::Invalid(format!(
+                    "marker alias {marker:?} for layer {layer_id:?} {semantic_name} may not contain ':' or a newline"
+                )));
+            }
+            if let Some(existing) = owners.insert(marker.as_str(), semantic_name) {
+                return Err(ConfigurationError::Invalid(format!(
+                    "marker alias {marker:?} in layer {layer_id:?} is assigned to both {existing} and {semantic_name}"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_glob_pattern(pattern: &str, field: &str) -> Result<(), ConfigurationError> {
+    if pattern.is_empty() {
+        return Err(ConfigurationError::Invalid(format!(
+            "{field} may not contain an empty glob"
+        )));
+    }
+    if pattern.contains('\0') || pattern.contains('\n') || pattern.contains('\r') {
+        return Err(ConfigurationError::Invalid(format!(
+            "glob {pattern:?} in {field} contains an unsupported control character"
+        )));
+    }
+    Ok(())
+}
+
+fn humanize_layer_id(layer_id: &str) -> String {
+    let mut output = String::with_capacity(layer_id.len());
+    let mut capitalize = true;
+    for character in layer_id.chars() {
+        if character == '-' || character == '_' {
+            output.push(' ');
+            capitalize = true;
+        } else if capitalize {
+            output.extend(character.to_uppercase());
+            capitalize = false;
+        } else {
+            output.push(character);
+        }
+    }
+    output
+}
+
+fn normalize_string_list(values: &mut Vec<String>) {
     for value in values.iter_mut() {
         *value = value.trim().to_owned();
+    }
+    values.retain(|value| !value.is_empty());
+    values.sort();
+    values.dedup();
+}
+
+fn normalize_path_list(values: &mut Vec<String>) {
+    for value in values.iter_mut() {
+        *value = value.trim().replace('\\', "/");
     }
     values.retain(|value| !value.is_empty());
     values.sort();
@@ -305,7 +414,7 @@ fn normalize_list(values: &mut Vec<String>) {
 fn validate_non_empty_list(name: &str, values: &[String]) -> Result<(), ConfigurationError> {
     if values.is_empty() {
         return Err(ConfigurationError::Invalid(format!(
-            "{name} must contain at least one alias"
+            "{name} must contain at least one value"
         )));
     }
     Ok(())
@@ -337,31 +446,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_use_canonical_archgraph_tokens() {
+    fn defaults_include_the_architecture_layer() {
         let config = ProjectConfiguration::default();
+        let architecture = config
+            .layers
+            .get(DEFAULT_LAYER_ID)
+            .expect("architecture layer");
+        assert_eq!(architecture.files, vec!["ARCHITECTURE.md".to_owned()]);
+        assert_eq!(architecture.markers.node, vec!["ARCH_NODE".to_owned()]);
         assert_eq!(
-            config.aliasing.architecture_files,
-            vec!["ARCHITECTURE.md".to_owned()]
-        );
-        assert_eq!(config.aliasing.node_markers, vec!["ARCH_NODE".to_owned()]);
-        assert_eq!(
-            config.aliasing.reference_markers,
+            architecture.markers.reference,
             vec!["ARCH_REFERENCE".to_owned()]
         );
         assert_eq!(
-            config.aliasing.subreference_markers,
+            architecture.markers.subreference,
             vec!["ARCH_SUBREFERENCE".to_owned()]
         );
     }
 
     #[test]
-    fn rejects_marker_alias_collisions() {
+    fn missing_architecture_layer_is_restored_during_normalization() {
         let config = ProjectConfiguration {
-            aliasing: AliasingConfiguration {
-                reference_markers: vec!["REF".to_owned()],
-                subreference_markers: vec!["REF".to_owned()],
-                ..AliasingConfiguration::default()
-            },
+            layers: BTreeMap::from([(
+                "implementation".to_owned(),
+                LayerConfiguration {
+                    files: vec!["*.ts".to_owned()],
+                    ..LayerConfiguration::default()
+                },
+            )]),
+            ..ProjectConfiguration::default()
+        };
+        let normalized = normalize_and_validate(config).expect("valid config");
+        assert!(normalized.layers.contains_key(DEFAULT_LAYER_ID));
+        assert!(normalized.layers.contains_key("implementation"));
+    }
+
+    #[test]
+    fn rejects_marker_alias_collisions_inside_a_layer() {
+        let config = ProjectConfiguration {
+            layers: BTreeMap::from([(
+                DEFAULT_LAYER_ID.to_owned(),
+                LayerConfiguration {
+                    files: vec!["ARCHITECTURE.md".to_owned()],
+                    markers: MarkerConfiguration {
+                        reference: vec!["REF".to_owned()],
+                        subreference: vec!["REF".to_owned()],
+                        ..MarkerConfiguration::default()
+                    },
+                    ..LayerConfiguration::default()
+                },
+            )]),
             ..ProjectConfiguration::default()
         };
 
@@ -390,13 +524,16 @@ mod tests {
         fs::create_dir_all(&root).expect("temp project root");
 
         let mut config = ProjectConfiguration {
-            aliasing: AliasingConfiguration {
-                reference_markers: vec![" SYS_REF ".to_owned(), "ARCH_REF".to_owned()],
-                ..AliasingConfiguration::default()
-            },
+            ignored_paths: vec![" tests/fixtures/** ".to_owned()],
             default_view: Some(" sticky ".to_owned()),
             ..ProjectConfiguration::default()
         };
+        config
+            .layers
+            .get_mut(DEFAULT_LAYER_ID)
+            .expect("architecture layer")
+            .markers
+            .reference = vec![" SYS_REF ".to_owned(), "ARCH_REF".to_owned()];
         config
             .app_colours
             .colour_overrides
@@ -407,8 +544,9 @@ mod tests {
         let loaded = load_project_configuration(&root).expect("configuration reload");
         assert_eq!(written, loaded);
         assert_eq!(loaded.default_view.as_deref(), Some("sticky"));
+        assert_eq!(loaded.ignored_paths, vec!["tests/fixtures/**".to_owned()]);
         assert_eq!(
-            loaded.aliasing.reference_markers,
+            loaded.layers[DEFAULT_LAYER_ID].markers.reference,
             vec!["ARCH_REF".to_owned(), "SYS_REF".to_owned()]
         );
         assert_eq!(

@@ -2,29 +2,33 @@
 
 ## Responsibility
 
-The Rust core owns project scanning, `.archgraph` configuration, architecture-document parsing, graph construction, diagnostics, and project-configuration writes.
+The Rust core owns project scanning, `.archgraph` configuration, source discovery/parsing, layer construction, group composition, diagnostics, and configuration writes.
 
 It does not depend on the desktop application or any programming language.
 
 ## Core operations
 
-1. Validate and canonicalize the selected project root.
+1. Validate and canonicalize the project root.
 2. Read root `.archgraph` if present.
-3. Normalize and validate aliases/configuration.
+3. Normalize layers, markers, ignored paths, colour/view settings.
 4. Walk the project tree without following symlinks.
-5. Find configured architecture-document filenames.
-6. Parse configured node/reference/subreference markers.
-7. Resolve normal references only against documented architecture-node names.
-8. Create shared or local lightweight reference nodes where appropriate.
-9. Produce graph nodes, edges, and diagnostics.
-10. Return normalized configuration to consumers that request project state.
+5. Apply built-in ignores, Git ignores, `.archgraphignore`, and configured `ignored_paths`.
+6. Match files against per-layer globs.
+7. Skip files matching multiple layers with `ARCH007`.
+8. Parse Markdown sources with the Markdown parser; parse all other source types with decorated-text semantics.
+9. Ignore candidate sources that contain no markers.
+10. Build one graph per layer.
+11. Compose supplied layer groups with core-owned name matching.
+12. Return graph/layers/configuration state to consumers.
 
 ## Source-language independence
 
-The core intentionally does not parse TypeScript, Rust, Python, imports, exports, symbols, packages, or ASTs. Source files are irrelevant unless they are architecture documents under a configured filename.
+The decorated parser recognizes a punctuation decoration prefix before configured markers, for example `///`, `#`, `--`, or `*`. It strips the same prefix from adjacent declaration/reference prose.
+
+This is lexical annotation handling, not TypeScript/Rust/Python/etc. parsing.
 
 ## Configuration writes
 
-Consumers can submit a typed `ProjectConfiguration` to the core. The core validates and canonicalizes it, serializes strict JSON, writes a completed temporary file, and replaces the root `.archgraph` file.
+Consumers submit typed `ProjectConfiguration` values to the core. The core validates and normalizes them, writes completed strict JSON to a temporary file, then replaces root `.archgraph`.
 
-`view_settings` is transported as application-defined JSON values; the core does not interpret layout-specific keys.
+`view_settings` remains opaque application JSON. Rust transports it without understanding desktop-specific layer-group or layout keys.

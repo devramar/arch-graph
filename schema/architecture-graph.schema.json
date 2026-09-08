@@ -1,20 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archgraph.dev/schema/architecture-graph-v2.json",
+  "$id": "https://archgraph.dev/schema/architecture-graph-v3.json",
   "title": "ArchGraph Architecture Graph",
   "description": "Presentation-independent serialized output of archgraph-core.",
   "type": "object",
-  "required": ["version", "project", "nodes", "edges", "diagnostics"],
+  "required": ["version", "project", "groups", "nodes", "edges", "diagnostics"],
   "properties": {
-    "version": { "const": 2 },
-    "project": {
-      "type": "object",
-      "required": ["name", "root"],
-      "properties": {
-        "name": { "type": "string" },
-        "root": { "type": "string" }
-      },
-      "additionalProperties": false
+    "version": { "const": 3 },
+    "project": { "$ref": "#/$defs/project" },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/group" }
     },
     "nodes": {
       "type": "array",
@@ -31,6 +27,15 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "project": {
+      "type": "object",
+      "required": ["name", "root"],
+      "properties": {
+        "name": { "type": "string" },
+        "root": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "sourceLocation": {
       "type": "object",
       "required": ["file"],
@@ -40,22 +45,45 @@
       },
       "additionalProperties": false
     },
+    "group": {
+      "type": "object",
+      "required": ["id", "name", "layerIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "layerIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "declaration": {
+      "type": "object",
+      "required": ["layerId", "layerName", "source", "sourceFormat"],
+      "properties": {
+        "layerId": { "type": "string", "minLength": 1 },
+        "layerName": { "type": "string" },
+        "source": { "$ref": "#/$defs/sourceLocation" },
+        "documentation": { "type": ["string", "null"] },
+        "sourceFormat": { "enum": ["markdown", "decoratedText"] }
+      },
+      "additionalProperties": false
+    },
     "node": {
       "type": "object",
-      "required": ["id", "name", "kind"],
+      "required": ["id", "name", "kind", "groupId", "declarations"],
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "kind": { "enum": ["architecture", "reference"] },
+        "groupId": { "type": "string", "minLength": 1 },
         "referenceScope": { "enum": ["shared", "local", null] },
-        "source": {
-          "anyOf": [
-            { "$ref": "#/$defs/sourceLocation" },
-            { "type": "null" }
-          ]
-        },
-        "summary": { "type": ["string", "null"] },
-        "documentation": { "type": ["string", "null"] }
+        "declarations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/declaration" }
+        }
       },
       "allOf": [
         {
@@ -63,19 +91,46 @@
             "properties": { "kind": { "const": "reference" } },
             "required": ["kind"]
           },
-          "then": { "required": ["referenceScope"] }
+          "then": {
+            "required": ["referenceScope"],
+            "properties": {
+              "declarations": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "architecture" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "declarations": { "minItems": 1 }
+            }
+          }
         }
       ],
       "additionalProperties": false
     },
     "edge": {
       "type": "object",
-      "required": ["id", "source", "target", "targetName", "sourceLocation", "referenceKind"],
+      "required": [
+        "id",
+        "source",
+        "target",
+        "targetName",
+        "groupId",
+        "layerId",
+        "sourceLocation",
+        "referenceKind"
+      ],
       "properties": {
         "id": { "type": "string" },
         "source": { "type": "string" },
         "target": { "type": "string" },
         "targetName": { "type": "string" },
+        "groupId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
         "description": { "type": ["string", "null"] },
         "sourceLocation": { "$ref": "#/$defs/sourceLocation" },
         "referenceKind": { "enum": ["reference", "subreference"] }
@@ -86,7 +141,9 @@
       "type": "object",
       "required": ["code", "severity", "message"],
       "properties": {
-        "code": { "enum": ["ARCH001", "ARCH002", "ARCH004", "ARCH005"] },
+        "code": {
+          "enum": ["ARCH001", "ARCH002", "ARCH004", "ARCH005", "ARCH006", "ARCH007"]
+        },
         "severity": { "enum": ["warning", "error"] },
         "message": { "type": "string" },
         "source": {
@@ -95,6 +152,8 @@
             { "type": "null" }
           ]
         },
+        "layerId": { "type": ["string", "null"] },
+        "groupId": { "type": ["string", "null"] },
         "candidates": {
           "type": "array",
           "items": { "type": "string" }

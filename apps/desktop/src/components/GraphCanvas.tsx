@@ -15,7 +15,7 @@ import { filterKindForNode, type NodeKindFilter } from './Sidebar';
 cytoscape.use(dagre);
 cytoscape.use(fcose);
 
-type LayoutName = 'directed' | 'organic' | 'sticky';
+export type LayoutName = 'directed' | 'organic' | 'sticky';
 
 type ColourPair = {
     name: string;
@@ -29,6 +29,8 @@ interface GraphCanvasProps {
     filters: NodeKindFilter;
     search: string;
     selection: GraphSelection;
+    layout: LayoutName;
+    onLayoutChange: (layout: LayoutName) => void;
     onSelectionChange: (selection: GraphSelection) => void;
     onOpenSource: (source: SourceLocation) => void;
 }
@@ -48,6 +50,16 @@ interface GraphContextMenu {
     label: string;
 }
 
+interface RenderedRegion {
+    id: string;
+    name: string;
+    layerIds: string[];
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+}
+
 interface ViewLayoutSettings {
     referenceDistance: number;
     subreferenceDistance: number;
@@ -57,6 +69,8 @@ interface ViewLayoutSettings {
 
 const DEFAULT_WHEEL_SENSITIVITY = 0.54;
 const SHIFT_WHEEL_SENSITIVITY = 1.0;
+const REGION_GAP = 180;
+const REGION_PADDING = 28;
 
 const ARCHITECTURE_COLOUR: ColourPair = {
     name: 'architecture',
@@ -218,6 +232,7 @@ function elementsFor(
                     id: node.id,
                     label: node.name,
                     kind: node.kind,
+                    groupId: node.groupId,
                     referenceScope: node.referenceScope ?? '',
                     backgroundColor: colour.secondary,
                     borderColor: colour.primary,
@@ -231,6 +246,7 @@ function elementsFor(
                 id: edge.id,
                 source: edge.source,
                 target: edge.target,
+                groupId: edge.groupId,
                 referenceKind: edge.referenceKind,
                 targetColour: colours.get(edge.target)?.primary ?? ARCHITECTURE_COLOUR.primary,
                 raw: edge,
@@ -257,23 +273,40 @@ function settingsFor(configuration: ProjectConfiguration, layout: LayoutName): V
     };
 }
 
-function defaultLayout(configuration: ProjectConfiguration): LayoutName {
-    if (configuration.default_view === 'directed' || configuration.default_view === 'organic' || configuration.default_view === 'sticky') {
-        return configuration.default_view;
+function packGroups(cy: Core, graph: ArchitectureGraph) {
+    if (graph.groups.length <= 1) return;
+
+    let cursorX = 0;
+    for (const group of graph.groups) {
+        const groupNodes = cy.nodes().filter((node) => node.data('groupId') === group.id);
+        if (groupNodes.empty()) continue;
+        const box = groupNodes.boundingBox({ includeLabels: true });
+        const dx = cursorX - box.x1;
+        const dy = -box.y1;
+        groupNodes.positions((node) => ({
+            x: node.position('x') + dx,
+            y: node.position('y') + dy,
+        }));
+        cursorX += box.w + REGION_GAP;
     }
-    return 'directed';
 }
 
 function runLayout(
     cy: Core,
     layout: LayoutName,
     configuration: ProjectConfiguration,
-    incremental = false,
+    graph: ArchitectureGraph,
+    incremental: boolean,
+    onSettled: () => void,
 ) {
-    const settings = settingsFor(configuration, layout);
+    if (cy.nodes().empty()) {
+        onSettled();
+        return;
+    }
 
-    if (layout === 'directed') {
-        cy.layout({
+    const settings = settingsFor(configuration, layout);
+    const options = layout === 'directed'
+        ? {
             name: 'dagre',
             rankDir: 'LR',
             rankSep: Math.max(90, settings.referenceDistance * 0.62),
@@ -282,30 +315,34 @@ function runLayout(
             padding: 48,
             minLen: (edge: EdgeSingular) => edge.data('referenceKind') === 'subreference' ? 1 : 2,
             edgeWeight: (edge: EdgeSingular) => edge.data('referenceKind') === 'subreference' ? 4 : 1,
-        } as cytoscape.LayoutOptions).run();
-        return;
-    }
+        }
+        : {
+            name: 'fcose',
+            quality: incremental ? 'proof' : 'default',
+            randomize: !incremental,
+            animate: incremental,
+            animationDuration: incremental ? 350 : 0,
+            fit: false,
+            padding: 48,
+            nodeRepulsion: 6200,
+            idealEdgeLength: (edge: EdgeSingular) => edge.data('referenceKind') === 'subreference'
+                ? settings.subreferenceDistance
+                : settings.referenceDistance,
+            edgeElasticity: (edge: EdgeSingular) => edge.data('referenceKind') === 'subreference'
+                ? 0.45 / settings.subreferenceAttraction
+                : 0.45,
+            nestingFactor: 0.1,
+            gravity: 0.22,
+            numIter: incremental ? 1000 : 2800,
+            initialEnergyOnIncremental: 0.2,
+        };
 
-    cy.layout({
-        name: 'fcose',
-        quality: incremental ? 'proof' : 'default',
-        randomize: !incremental,
-        animate: incremental,
-        animationDuration: incremental ? 350 : 0,
-        fit: !incremental,
-        padding: 48,
-        nodeRepulsion: 6200,
-        idealEdgeLength: (edge: EdgeSingular) => edge.data('referenceKind') === 'subreference'
-            ? settings.subreferenceDistance
-            : settings.referenceDistance,
-        edgeElasticity: (edge: EdgeSingular) => edge.data('referenceKind') === 'subreference'
-            ? 0.45 / settings.subreferenceAttraction
-            : 0.45,
-        nestingFactor: 0.1,
-        gravity: 0.22,
-        numIter: incremental ? 1000 : 2800,
-        initialEnergyOnIncremental: 0.2,
-    } as cytoscape.LayoutOptions).run();
+    const layoutRunner = cy.layout(options as cytoscape.LayoutOptions);
+    layoutRunner.one('layoutstop', () => {
+        packGroups(cy, graph);
+        onSettled();
+    });
+    layoutRunner.run();
 }
 
 function edgeNames(graph: ArchitectureGraph, edge: ArchitectureEdge) {
@@ -323,19 +360,20 @@ export function GraphCanvas({
     filters,
     search,
     selection,
+    layout,
+    onLayoutChange,
     onSelectionChange,
     onOpenSource,
 }: GraphCanvasProps) {
-    const initialLayout = defaultLayout(configuration);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const cyRef = useRef<Core | null>(null);
     const spaceDownRef = useRef(false);
     const panRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
-    const layoutRef = useRef<LayoutName>(initialLayout);
-    const [layout, setLayout] = useState<LayoutName>(initialLayout);
+    const layoutRef = useRef<LayoutName>(layout);
     const [hoveredEdge, setHoveredEdge] = useState<HoveredEdge | null>(null);
     const [contextMenu, setContextMenu] = useState<GraphContextMenu | null>(null);
     const [showEdgeDetails, setShowEdgeDetails] = useState(true);
+    const [regions, setRegions] = useState<RenderedRegion[]>([]);
     const elements = useMemo(() => elementsFor(graph, configuration), [graph, configuration]);
 
     useEffect(() => {
@@ -355,8 +393,36 @@ export function GraphCanvas({
             userZoomingEnabled: true,
         });
         cyRef.current = cy;
-        runLayout(cy, layoutRef.current, configuration);
-        cy.fit(undefined, 48);
+        layoutRef.current = layout;
+
+        const updateRegions = () => {
+            const zoom = cy.zoom();
+            const pan = cy.pan();
+            const next = graph.groups.flatMap<RenderedRegion>((group) => {
+                const groupNodes = cy.nodes().filter((node) => (
+                    node.data('groupId') === group.id && node.visible()
+                ));
+                if (groupNodes.empty()) return [];
+                const box = groupNodes.boundingBox({ includeLabels: true });
+                return [{
+                    id: group.id,
+                    name: group.name,
+                    layerIds: group.layerIds,
+                    left: box.x1 * zoom + pan.x - REGION_PADDING,
+                    top: box.y1 * zoom + pan.y - REGION_PADDING - 18,
+                    width: box.w * zoom + REGION_PADDING * 2,
+                    height: box.h * zoom + REGION_PADDING * 2 + 18,
+                }];
+            });
+            setRegions(next);
+        };
+
+        const settle = (fit: boolean) => {
+            if (fit && !cy.nodes().empty()) cy.fit(undefined, 64);
+            updateRegions();
+        };
+
+        runLayout(cy, layout, configuration, graph, false, () => settle(true));
 
         const onNodeTap = (event: EventObject) => {
             setContextMenu(null);
@@ -389,9 +455,10 @@ export function GraphCanvas({
         const openNodeContext = (event: EventObject) => {
             const node = event.target as NodeSingular;
             const raw = node.data('raw') as ArchitectureNode;
-            if (!raw.source) return;
+            const declaration = raw.declarations[0];
+            if (!declaration) return;
             const point = event.renderedPosition ?? node.renderedPosition();
-            setContextMenu({ x: point.x, y: point.y, source: raw.source, label: raw.name });
+            setContextMenu({ x: point.x, y: point.y, source: declaration.source, label: raw.name });
         };
         const openEdgeContext = (event: EventObject) => {
             const edge = event.target as EdgeSingular;
@@ -407,7 +474,12 @@ export function GraphCanvas({
         };
         const settleStickyLayout = () => {
             if (layoutRef.current !== 'sticky') return;
-            runLayout(cy, 'sticky', configuration, true);
+            runLayout(cy, 'sticky', configuration, graph, true, () => settle(false));
+        };
+        const fitGraph = () => {
+            if (cy.nodes().empty()) return;
+            cy.fit(undefined, 64);
+            updateRegions();
         };
 
         cy.on('tap', 'node', onNodeTap);
@@ -418,6 +490,7 @@ export function GraphCanvas({
         cy.on('cxttap', 'node', openNodeContext);
         cy.on('cxttap', 'edge', openEdgeContext);
         cy.on('dragfree', 'node', settleStickyLayout);
+        cy.on('pan zoom position resize', updateRegions);
         cy.on('pan zoom', clearHover);
 
         const keyDown = (event: KeyboardEvent) => {
@@ -427,7 +500,7 @@ export function GraphCanvas({
             if (event.code === 'Escape') setContextMenu(null);
 
             if (event.code === 'KeyF' && !event.repeat) {
-                cy.fit(undefined, 48);
+                fitGraph();
                 event.preventDefault();
                 return;
             }
@@ -485,6 +558,7 @@ export function GraphCanvas({
             });
         };
 
+        (container as HTMLDivElement & { __archgraphFit?: () => void }).__archgraphFit = fitGraph;
         window.addEventListener('keydown', keyDown, true);
         window.addEventListener('keyup', keyUp, true);
         container.addEventListener('pointerdown', pointerDown, true);
@@ -505,10 +579,22 @@ export function GraphCanvas({
             container.removeEventListener('auxclick', suppressAux);
             container.removeEventListener('contextmenu', suppressNativeContextMenu);
             container.removeEventListener('wheel', amplifiedShiftZoom, true);
+            delete (container as HTMLDivElement & { __archgraphFit?: () => void }).__archgraphFit;
             cy.destroy();
             cyRef.current = null;
+            setRegions([]);
         };
     }, [elements, graph, configuration]);
+
+    useEffect(() => {
+        if (layoutRef.current === layout) return;
+        layoutRef.current = layout;
+        const cy = cyRef.current;
+        if (!cy) return;
+        runLayout(cy, layout, configuration, graph, false, () => {
+            if (!cy.nodes().empty()) cy.fit(undefined, 64);
+        });
+    }, [layout, configuration, graph]);
 
     useEffect(() => {
         const cy = cyRef.current;
@@ -523,6 +609,7 @@ export function GraphCanvas({
                 edge.source().hasClass('hidden-by-filter') || edge.target().hasClass('hidden-by-filter'),
             );
         });
+        cy.emit('resize');
     }, [filters]);
 
     useEffect(() => {
@@ -544,13 +631,9 @@ export function GraphCanvas({
         if (selection) cy.getElementById(selection.item.id).select();
     }, [selection]);
 
-    const changeLayout = (next: LayoutName) => {
-        setLayout(next);
-        layoutRef.current = next;
-        const cy = cyRef.current;
-        if (!cy) return;
-        runLayout(cy, next, configuration);
-        cy.fit(undefined, 48);
+    const fitGraph = () => {
+        const container = containerRef.current as (HTMLDivElement & { __archgraphFit?: () => void }) | null;
+        container?.__archgraphFit?.();
     };
 
     const selectedEdge = selection?.kind === 'edge' ? selection.item : null;
@@ -559,8 +642,27 @@ export function GraphCanvas({
 
     return (
         <div className="graph-panel">
+            <div className="graph-region-overlay" aria-hidden="true">
+                {regions.map((region) => (
+                    <div
+                        className="graph-region"
+                        key={region.id}
+                        style={{
+                            left: region.left,
+                            top: region.top,
+                            width: region.width,
+                            height: region.height,
+                        }}
+                    >
+                        <span className="graph-region-label">{region.name}</span>
+                        {region.layerIds.length > 1 ? (
+                            <span className="graph-region-meta">{region.layerIds.length} merged layers</span>
+                        ) : null}
+                    </div>
+                ))}
+            </div>
             <div className="graph-toolbar">
-                <button onClick={() => cyRef.current?.fit(undefined, 48)}>Fit</button>
+                <button onClick={fitGraph}>Fit</button>
                 <button
                     className={showEdgeDetails ? 'active' : ''}
                     onClick={() => setShowEdgeDetails((current) => !current)}
@@ -568,7 +670,7 @@ export function GraphCanvas({
                 >
                     Descriptions
                 </button>
-                <select value={layout} onChange={(event) => changeLayout(event.target.value as LayoutName)} aria-label="Graph layout">
+                <select value={layout} onChange={(event) => onLayoutChange(event.target.value as LayoutName)} aria-label="Graph layout">
                     <option value="directed">Directed</option>
                     <option value="organic">Organic</option>
                     <option value="sticky">Sticky</option>

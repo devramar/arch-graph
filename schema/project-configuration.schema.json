@@ -1,23 +1,32 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archgraph.dev/schema/project-configuration-v1.json",
+  "$id": "https://archgraph.dev/schema/project-configuration-v2.json",
   "title": "ArchGraph Project Configuration",
   "description": "Optional root .archgraph configuration consumed by archgraph-core.",
   "type": "object",
   "properties": {
-    "aliasing": {
-      "type": "object",
-      "properties": {
-        "ARCHITECTURE.md": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "$ref": "#/$defs/architectureFilename" }
-        },
-        "ARCH_NODE": { "$ref": "#/$defs/markerList" },
-        "ARCH_REFERENCE": { "$ref": "#/$defs/markerList" },
-        "ARCH_SUBREFERENCE": { "$ref": "#/$defs/markerList" }
+    "ignored_paths": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glob"
       },
-      "additionalProperties": false
+      "uniqueItems": true
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/layer"
+      },
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^\\S+$"
+      },
+      "properties": {
+        "architecture": {
+          "$ref": "#/$defs/architectureLayer"
+        }
+      }
     },
     "app_colours": {
       "type": "object",
@@ -25,8 +34,12 @@
         "colour_overrides": {
           "type": "object",
           "properties": {
-            "references": { "$ref": "#/$defs/colourMap" },
-            "subreferences": { "$ref": "#/$defs/colourMap" }
+            "references": {
+              "$ref": "#/$defs/colourMap"
+            },
+            "subreferences": {
+              "$ref": "#/$defs/colourMap"
+            }
           },
           "additionalProperties": false
         }
@@ -45,18 +58,53 @@
   },
   "additionalProperties": false,
   "$defs": {
-    "architectureFilename": {
+    "glob": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?=.*\\S)[^/\\\\]+$",
-      "not": {
-        "enum": [".", "..", ".archgraph"]
-      }
+      "pattern": "^(?=.*\\S)[^\\r\\n]+$"
+    },
+    "layer": {
+      "type": "object",
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceGlob"
+          },
+          "uniqueItems": true
+        },
+        "markers": {
+          "type": "object",
+          "properties": {
+            "ARCH_NODE": {
+              "$ref": "#/$defs/markerList"
+            },
+            "ARCH_REFERENCE": {
+              "$ref": "#/$defs/markerList"
+            },
+            "ARCH_SUBREFERENCE": {
+              "$ref": "#/$defs/markerList"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "files"
+      ]
     },
     "markerList": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/marker" }
+      "items": {
+        "$ref": "#/$defs/marker"
+      },
+      "uniqueItems": true
     },
     "marker": {
       "type": "string",
@@ -74,6 +122,50 @@
         "minLength": 1,
         "pattern": "\\S"
       }
+    },
+    "sourceGlob": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/glob"
+        },
+        {
+          "not": {
+            "const": ".archgraph"
+          }
+        }
+      ]
+    },
+    "architectureLayer": {
+      "type": "object",
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceGlob"
+          },
+          "uniqueItems": true
+        },
+        "markers": {
+          "type": "object",
+          "properties": {
+            "ARCH_NODE": {
+              "$ref": "#/$defs/markerList"
+            },
+            "ARCH_REFERENCE": {
+              "$ref": "#/$defs/markerList"
+            },
+            "ARCH_SUBREFERENCE": {
+              "$ref": "#/$defs/markerList"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

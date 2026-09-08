@@ -4,35 +4,41 @@ ARCH_NODE:ArchGraph Desktop
 
 ## Description
 
-Desktop-first Tauri application for interactively exploring graphs produced by ArchGraph Core.
+Desktop-first Tauri application for interactively exploring layered graphs produced by ArchGraph Core.
 
 ---
 ## Purpose
 
-Provide a local PC-optimized graph explorer with project drag/drop, search, filtering, reference hover documentation, source opening, configurable layouts, and detailed inspection.
+Provide a local PC-optimized graph explorer with project drag/drop, layer grouping, simultaneous graph regions, search, filtering, reference documentation, source opening, configurable layouts, and multi-source inspection.
 
 ---
 ## Intended Usage
 
-Drop or open one project root, then explore its generated graph. The frontend does not directly traverse or modify the project filesystem.
+Drop or open one project root, then arrange discovered layers into visible groups. Layers inside one group merge matching node names; different enabled groups remain visible simultaneously as separate regions.
+
+The frontend does not directly traverse or modify the project filesystem.
 
 ---
 ## Architecture
 
-The Tauri adapter invokes the standalone Rust core and returns both its neutral graph and normalized `.archgraph` project configuration. React translates that graph into Cytoscape.js elements and owns presentation and interaction only. Architecture-node records include their raw architecture document so the inspector can display documentation without direct filesystem reads.
+The Tauri adapter invokes ArchGraph Core and receives independently scanned layers, normalized configuration, configuration-presence state, and a default graph. React owns session/group UI but asks Rust to compose layer groups so graph semantics remain core-owned.
 
-The desktop uses a deterministic built-in reference colour palette. `.archgraph` may override colour names separately for shared references and subreferences. Edge arrows use the destination node primary colour. Local subreferences render as smaller dashed satellite nodes and use shorter force-layout distances than ordinary references.
+Merged architecture nodes preserve every declaration. The inspector exposes declaration tabs, allowing architecture-level and implementation-level sources to describe the same node without discarding either source.
+
+The desktop uses deterministic reference colours. `.archgraph` may override colour names separately for references and subreferences. Edge arrows use the destination node primary colour. Local subreferences render as smaller dashed satellite nodes and use shorter force-layout distances than normal references.
+
+Enabled layer groups render as soft labeled graph regions. Separate groups are packed apart while remaining visible in the same canvas.
 
 ---
 ## References
 
 ARCH_REFERENCE:ArchGraph Core
 
-Provides scanning, `.archgraph` parsing/writing, reference resolution, diagnostics, and the canonical graph/configuration data returned to the frontend.
+Provides scanning, `.archgraph` parsing/writing, layer discovery, composition semantics, diagnostics, and canonical graph/configuration data.
 
 ARCH_REFERENCE:ArchitectureGraph
 
-The frontend consumes the neutral graph contract rather than embedding scanner semantics in Cytoscape-specific structures.
+The frontend consumes the neutral graph contract rather than embedding scanner or merge semantics in Cytoscape-specific structures.
 
 ---
 ## Invariants
@@ -40,10 +46,12 @@ The frontend consumes the neutral graph contract rather than embedding scanner s
 - Normal operation is offline.
 - The webview does not receive generic filesystem traversal or write APIs.
 - Project configuration writes go through the Rust core.
-- Left background drag, middle drag, and Space+drag all pan the graph.
-- Normal direct node drag remains available.
+- Without a root `.archgraph`, desktop group/layout changes are session-only.
+- Creating `.archgraph` promotes the current session state into persisted desktop view settings.
+- Several layer groups may remain enabled and visible simultaneously.
+- Same-name declarations merge only within one group.
+- Merged nodes retain all declaration sources and expose them as inspector tabs.
 - Source opening is confined to files beneath the selected project root.
-- Architecture document viewing consumes content already present in the core graph model.
 - Reference descriptions remain edge-owned documentation.
 - Same-name subreferences remain distinct graph nodes while sharing deterministic visual colour identity.
 
@@ -51,16 +59,19 @@ The frontend consumes the neutral graph contract rather than embedding scanner s
 ## Relevant Files
 
 `src/App.tsx`
-: Desktop UI orchestration and project loading.
+: Project loading, group composition requests, session persistence, and top-level UI state.
+
+`src/components/Sidebar.tsx`
+: Layer-group drag/drop, enable/disable controls, config-persistence state, filters, diagnostics.
 
 `src/components/GraphCanvas.tsx`
-: Cytoscape rendering, colours, layouts, and desktop graph interaction.
+: Cytoscape rendering, destination colours, group regions, layouts, and graph interaction.
 
 `src/components/Inspector.tsx`
-: Node/reference inspection, source actions, and architecture-document presentation.
+: Node/reference inspection and multi-declaration tabs.
 
 `src/components/MarkdownDocument.tsx`
-: Small safe Markdown-oriented architecture document renderer.
+: Safe Markdown-oriented declaration renderer.
 
 `src-tauri/src/lib.rs`
-: Thin Tauri adapter around ArchGraph Core, including configuration writes.
+: Thin adapter around scan, compose, configuration-write, and root-confined source-open operations.

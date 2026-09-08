@@ -18,13 +18,15 @@ pub(crate) fn resolve_reference(
     source_node_id: &str,
     ordinal: usize,
     source: &SourceLocation,
+    layer_id: &str,
 ) -> Resolution {
     if kind == ReferenceKind::Subreference {
         return Resolution {
             node: reference_node(
-                format!("subref:{source_node_id}:{ordinal}#{target}"),
+                format!("subref:{layer_id}:{source_node_id}:{ordinal}#{target}"),
                 target,
                 ReferenceScope::Local,
+                layer_id,
             ),
             diagnostic: None,
         };
@@ -41,21 +43,24 @@ pub(crate) fn resolve_reference(
         if candidates.len() > 1 {
             return Resolution {
                 node: reference_node(
-                    format!("reference:{target}"),
+                    format!("reference:{layer_id}:{target}"),
                     target,
                     ReferenceScope::Shared,
+                    layer_id,
                 ),
                 diagnostic: Some(Diagnostic {
                     code: DiagnosticCode::AmbiguousReference,
                     severity: DiagnosticSeverity::Warning,
                     message: format!(
-                        "Reference {target:?} matches multiple architecture documents"
+                        "Reference {target:?} matches multiple architecture declarations in layer {layer_id:?}"
                     ),
                     source: Some(source.clone()),
+                    layer_id: Some(layer_id.to_owned()),
+                    group_id: Some(layer_id.to_owned()),
                     candidates: candidates
                         .iter()
-                        .filter_map(|candidate| candidate.source.as_ref())
-                        .map(|location| location.file.display().to_string())
+                        .flat_map(|candidate| candidate.declarations.iter())
+                        .map(|declaration| declaration.source.file.display().to_string())
                         .collect(),
                 }),
             };
@@ -64,49 +69,78 @@ pub(crate) fn resolve_reference(
 
     Resolution {
         node: reference_node(
-            format!("reference:{target}"),
+            format!("reference:{layer_id}:{target}"),
             target,
             ReferenceScope::Shared,
+            layer_id,
         ),
         diagnostic: None,
     }
 }
 
-fn reference_node(id: String, name: &str, scope: ReferenceScope) -> ArchitectureNode {
+fn reference_node(
+    id: String,
+    name: &str,
+    scope: ReferenceScope,
+    group_id: &str,
+) -> ArchitectureNode {
     ArchitectureNode {
         id,
         name: name.to_owned(),
         kind: NodeKind::Reference,
+        group_id: group_id.to_owned(),
         reference_scope: Some(scope),
-        source: None,
-        summary: None,
-        documentation: None,
+        declarations: Vec::new(),
     }
 }
 
-pub(crate) fn architecture_node_id(relative_architecture_file: &Path, name: &str) -> String {
-    format!("arch:{}#{name}", relative_architecture_file.display())
+pub(crate) fn architecture_node_id(layer_id: &str, relative_source: &Path, name: &str) -> String {
+    format!("arch:{layer_id}:{}#{name}", relative_source.display())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{ArchitectureDeclaration, SourceFormat};
 
-    #[test]
-    fn undocumented_references_merge_by_explicit_name() {
-        let architectures = HashMap::new();
-        let source = SourceLocation {
+    fn source() -> SourceLocation {
+        SourceLocation {
             file: "ARCHITECTURE.md".into(),
             line: Some(4),
-        };
+        }
+    }
 
+    fn architecture(id: &str, file: &str) -> ArchitectureNode {
+        ArchitectureNode {
+            id: id.to_owned(),
+            name: "Identity".to_owned(),
+            kind: NodeKind::Architecture,
+            group_id: "architecture".to_owned(),
+            reference_scope: None,
+            declarations: vec![ArchitectureDeclaration {
+                layer_id: "architecture".to_owned(),
+                layer_name: "Architecture".to_owned(),
+                source: SourceLocation {
+                    file: file.into(),
+                    line: Some(3),
+                },
+                documentation: None,
+                source_format: SourceFormat::Markdown,
+            }],
+        }
+    }
+
+    #[test]
+    fn undocumented_references_merge_by_explicit_name_within_a_layer() {
+        let architectures = HashMap::new();
         let first = resolve_reference(
             "Authentication",
             ReferenceKind::Reference,
             &architectures,
             "arch:a#A",
             0,
-            &source,
+            &source(),
+            "architecture",
         );
         let second = resolve_reference(
             "Authentication",
@@ -114,7 +148,8 @@ mod tests {
             &architectures,
             "arch:b#B",
             0,
-            &source,
+            &source(),
+            "architecture",
         );
 
         assert_eq!(first.node.id, second.node.id);
@@ -124,24 +159,9 @@ mod tests {
     }
 
     #[test]
-    fn ordinary_reference_resolves_only_to_a_unique_architecture_node() {
-        let source = SourceLocation {
-            file: "ARCHITECTURE.md".into(),
-            line: Some(4),
-        };
-        let architecture = ArchitectureNode {
-            id: "arch:identity/ARCHITECTURE.md#Identity".to_owned(),
-            name: "Identity".to_owned(),
-            kind: NodeKind::Architecture,
-            reference_scope: None,
-            source: Some(SourceLocation {
-                file: "identity/ARCHITECTURE.md".into(),
-                line: Some(3),
-            }),
-            summary: None,
-            documentation: None,
-        };
-        let architectures = HashMap::from([("Identity".to_owned(), vec![architecture.clone()])]);
+    fn ordinary_reference_resolves_to_a_unique_architecture_declaration() {
+        let identity = architecture("arch:identity#Identity", "identity/ARCHITECTURE.md");
+        let architectures = HashMap::from([("Identity".to_owned(), vec![identity.clone()])]);
 
         let resolved = resolve_reference(
             "Identity",
@@ -149,31 +169,16 @@ mod tests {
             &architectures,
             "arch:checkout#Checkout",
             0,
-            &source,
+            &source(),
+            "architecture",
         );
 
-        assert_eq!(resolved.node, architecture);
+        assert_eq!(resolved.node, identity);
         assert!(resolved.diagnostic.is_none());
     }
 
     #[test]
     fn ambiguous_architecture_names_are_not_guessed() {
-        let source = SourceLocation {
-            file: "ARCHITECTURE.md".into(),
-            line: Some(4),
-        };
-        let architecture = |id: &str, file: &str| ArchitectureNode {
-            id: id.to_owned(),
-            name: "Identity".to_owned(),
-            kind: NodeKind::Architecture,
-            reference_scope: None,
-            source: Some(SourceLocation {
-                file: file.into(),
-                line: Some(3),
-            }),
-            summary: None,
-            documentation: None,
-        };
         let architectures = HashMap::from([(
             "Identity".to_owned(),
             vec![
@@ -188,7 +193,8 @@ mod tests {
             &architectures,
             "arch:checkout#Checkout",
             0,
-            &source,
+            &source(),
+            "architecture",
         );
 
         assert_eq!(resolved.node.kind, NodeKind::Reference);
@@ -205,18 +211,14 @@ mod tests {
     #[test]
     fn subreferences_never_merge() {
         let architectures = HashMap::new();
-        let source = SourceLocation {
-            file: "ARCHITECTURE.md".into(),
-            line: Some(4),
-        };
-
         let first = resolve_reference(
             "Password Management",
             ReferenceKind::Subreference,
             &architectures,
             "arch:a#A",
             0,
-            &source,
+            &source(),
+            "architecture",
         );
         let second = resolve_reference(
             "Password Management",
@@ -224,7 +226,8 @@ mod tests {
             &architectures,
             "arch:b#B",
             0,
-            &source,
+            &source(),
+            "architecture",
         );
 
         assert_ne!(first.node.id, second.node.id);

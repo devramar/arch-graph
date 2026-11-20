@@ -48,7 +48,7 @@
       "subreferences": {}
     }
   },
-  "default_view": "organic",
+  "default_view": "sticky",
   "view_settings": {
     "desktop": {
       "layer_groups": [
@@ -56,10 +56,17 @@
           "enabled": true,
           "id": "archgraph",
           "layer_ids": [
-            "architecture",
+            "architecture"
+          ],
+          "name": "Core Architecture"
+        },
+        {
+          "enabled": true,
+          "id": "layer:desktop",
+          "layer_ids": [
             "desktop"
           ],
-          "name": "Core Architecture + Desktop Architecture"
+          "name": "Desktop Architecture"
         }
       ]
     }
